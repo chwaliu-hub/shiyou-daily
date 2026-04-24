@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>食悠餐桌 每日收支</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f4f0;color:#222;font-size:15px;}
+h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-bottom:1px solid #e8e6e0;}
+.tabs{display:flex;background:#fff;border-bottom:1px solid #e8e6e0;position:sticky;top:0;z-index:10;}
+.tab{flex:1;padding:10px 4px;font-size:13px;text-align:center;cursor:pointer;color:#888;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;}
+.tab.active{color:#222;border-bottom-color:#222;font-weight:500;}
+.page{display:none;padding:16px 0;}.page.active{display:block;}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px;}
+.date-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+.date-bar input{flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;}
+.tbtn{padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;}
+.sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.scard{background:#fff;border-radius:10px;padding:12px 14px;border:1px solid #e8e6e0;}
+.scard .lbl{font-size:11px;color:#888;margin-bottom:4px;}
+.scard .val{font-size:20px;font-weight:600;}
+.block{background:#fff;border-radius:12px;border:1px solid #e8e6e0;padding:16px;margin-bottom:12px;}
+.block h3{font-size:14px;font-weight:600;margin-bottom:14px;color:#333;}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.fld{display:flex;flex-direction:column;gap:4px;}
+.fld label{font-size:12px;color:#666;display:flex;align-items:center;gap:5px;}
+.fld input,.fld select{padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;}
+.add-btn{width:100%;margin-top:10px;padding:10px;border:none;border-radius:8px;background:#222;color:#fff;font-size:14px;cursor:pointer;font-weight:500;}
+.imp-btn{width:100%;padding:12px;border:none;border-radius:8px;background:#1565c0;color:#fff;font-size:15px;cursor:pointer;font-weight:600;margin-bottom:14px;}
+.lblock{background:#fff;border:1px solid #e8e6e0;border-radius:12px;overflow:hidden;margin-bottom:12px;}
+.lrow{display:grid;grid-template-columns:1fr auto auto;font-size:13px;padding:11px 14px;border-top:1px solid #f0ede8;align-items:center;gap:8px;}
+.lrow:first-child{border-top:none;}
+.del{background:none;border:none;cursor:pointer;color:#bbb;font-size:15px;padding:2px 4px;}
+.del:hover{color:#e53935;}
+.empty{padding:28px;text-align:center;font-size:13px;color:#aaa;}
+.tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500;margin:2px 2px 2px 0;}
+.tag-imp{background:#e8eaf6;color:#3949ab;font-size:10px;}
+.drow{display:flex;justify-content:space-between;font-size:14px;padding:8px 0;border-bottom:1px solid #f0ede8;}
+.drow:last-child{border-bottom:none;}
+.no-data{text-align:center;padding:40px;color:#aaa;font-size:14px;}
+.cat-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0ede8;}
+.cat-item:last-child{border-bottom:none;}
+.cdot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.cname{flex:1;font-size:14px;}
+.cedit,.cdel{background:none;border:none;cursor:pointer;font-size:12px;color:#aaa;padding:4px 8px;}
+.cedit:hover{color:#333;}.cdel:hover{color:#e53935;}
+.color-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px;}
+.cdot-sel{width:24px;height:24px;border-radius:50%;cursor:pointer;border:3px solid transparent;}
+.cdot-sel.on{border-color:#222;}
+.add-row{display:flex;gap:8px;align-items:center;}
+.add-row input{flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;}
+.add-row button{padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;}
+.sec-lbl{font-size:12px;font-weight:600;color:#888;margin:4px 0 8px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.notice{padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;background:#e3f2fd;border:1px solid #90caf9;color:#0d47a1;}
+.loading-bar{display:none;position:fixed;top:0;left:0;right:0;height:3px;background:#1565c0;z-index:9999;animation:slide 1s infinite;}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.toast{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;white-space:nowrap;}
+.sync-status{font-size:11px;color:#aaa;text-align:right;padding:4px 0 8px;}
+</style>
+</head>
+<body>
+<div class="loading-bar" id="loading-bar"></div>
+<div class="toast" id="toast"></div>
+<h1>食悠餐桌 每日收支</h1>
+<div class="wrap">
+<div class="tabs">
+  <button class="tab active" id="tab-entry" onclick="sw('entry')">每日輸入</button>
+  <button class="tab" id="tab-history" onclick="sw('history')">歷史記錄</button>
+  <button class="tab" id="tab-summary" onclick="sw('summary')">月匯總</button>
+  <button class="tab" id="tab-settings" onclick="sw('settings')">類別設定</button>
+</div>
+
+<div class="page active" id="page-entry">
+  <div class="date-bar">
+    <input type="date" id="entry-date">
+    <button class="tbtn" onclick="setToday()">今天</button>
+  </div>
+  <div class="sync-status" id="sync-status">⏳ 載入中...</div>
+  <div class="sgrid">
+    <div class="scard"><div class="lbl">今日收入</div><div class="val" id="ti" style="color:#2e7d32;">$0</div></div>
+    <div class="scard"><div class="lbl">今日支出</div><div class="val" id="te" style="color:#c62828;">$0</div></div>
+    <div class="scard"><div class="lbl">今日結餘</div><div class="val" id="tp">$0</div></div>
+  </div>
+  <div class="block">
+    <h3>收入登錄</h3>
+    <div id="pay-inputs"></div>
+    <div class="fld"><label>備註</label><input type="text" id="in-note" placeholder="選填"></div>
+    <button class="add-btn" onclick="addIncome()">＋ 新增收入</button>
+  </div>
+  <div class="block">
+    <h3>支出登錄</h3>
+    <div class="row2">
+      <div class="fld"><label>類別</label><select id="exp-cat"></select></div>
+      <div class="fld"><label>金額</label><input type="number" id="exp-amount" placeholder="0" min="0"></div>
+    </div>
+    <div class="fld" style="margin-bottom:0"><label>說明</label><input type="text" id="exp-note" placeholder="選填"></div>
+    <button class="add-btn" onclick="addExpense()">＋ 新增支出</button>
+  </div>
+  <div class="block">
+    <h3>行動支付入帳</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px;">記錄 Line Pay、街口、悠遊卡實際撥款入銀行的日期與金額（與當日營業收入分開）</p>
+    <div class="row2">
+      <div class="fld"><label>支付平台</label>
+        <select id="settle-cat">
+          <option value="linepay">Line Pay</option>
+          <option value="jkopay">街口支付</option>
+          <option value="easycard">悠遊卡</option>
+        </select>
+      </div>
+      <div class="fld"><label>入帳金額</label>
+        <input type="number" id="settle-amount" placeholder="0" min="0">
+      </div>
+    </div>
+    <div class="fld" style="margin-bottom:0"><label>備註</label>
+      <input type="text" id="settle-note" placeholder="例：扣手續費後實收">
+    </div>
+    <button class="add-btn" style="background:#1565c0;" onclick="addSettle()">＋ 新增入帳記錄</button>
+  </div>
+  <div class="sec-lbl">今日明細</div>
+  <div class="lblock"><div id="today-list"><div class="empty">尚無記錄</div></div></div>
+</div>
+
+<div class="page" id="page-history">
+  <div class="date-bar" style="margin-bottom:12px;"><input type="month" id="history-month" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>
+  <div id="history-list"><div class="no-data">選擇月份查看記錄</div></div>
+</div>
+
+<div class="page" id="page-summary">
+  <div class="date-bar" style="margin-bottom:12px;"><input type="month" id="summary-month" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>
+  <div id="summary-content"><div class="no-data">選擇月份查看匯總</div></div>
+</div>
+
+<div class="page" id="page-settings">
+  <div class="notice" id="imp-notice">📦 已內嵌 1～3月歷史資料（206筆），點下方按鈕匯入。</div>
+  <button class="imp-btn" id="imp-btn" onclick="importHistorical()">📥 匯入 1～3月 歷史資料</button>
+  <div class="block" style="margin-bottom:12px;">
+    <h3>收入支付方式</h3>
+    <div id="pay-cat-list"></div>
+    <div class="sec-lbl" style="margin-top:14px;">選擇顏色</div>
+    <div class="color-row" id="pay-color-row"></div>
+    <div class="add-row">
+      <input type="text" id="new-pay-name" placeholder="新增支付方式">
+      <button onclick="addPayCat()">新增</button>
+    </div>
+  </div>
+  <div class="block">
+    <h3>支出類別</h3>
+    <div id="exp-cat-list"></div>
+    <div class="sec-lbl" style="margin-top:14px;">選擇顏色</div>
+    <div class="color-row" id="exp-color-row"></div>
+    <div class="add-row">
+      <input type="text" id="new-exp-name" placeholder="新增支出類別">
+      <button onclick="addExpCat()">新增</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- 歷史資料用 JSON 格式存在 textarea，避免 JS 字面量解析問題 -->
+<textarea id="historical-json" style="display:none">[{"id":"imp_2026-01-02_inc","date":"2026-01-02","type":"income","pays":{"cash":9615,"linepay":2877,"jkopay":1405,"easycard":765},"note":"[匯入] 營業額14662"},{"id":"imp_2026-01-02_exp_食材進貨","date":"2026-01-02","type":"expense","cat":"food","amount":600,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-02_exp_其他支出","date":"2026-01-02","type":"expense","cat":"misc","amount":975,"note":"[匯入] 其他支出 11410勞退金2176 電子鍋分期1156 音樂月租231"},{"id":"imp_2026-01-02_exp_勞健保勞退","date":"2026-01-02","type":"expense","cat":"staff","amount":2176,"note":"[匯入] 勞健保勞退"},{"id":"imp_2026-01-02_exp_電話網路","date":"2026-01-02","type":"expense","cat":"fixed","amount":231,"note":"[匯入] 電話網路"},{"id":"imp_2026-01-03_exp_電話網路","date":"2026-01-03","type":"expense","cat":"fixed","amount":202,"note":"[匯入] 電話網路"},{"id":"imp_2026-01-05_inc","date":"2026-01-05","type":"income","pays":{"cash":12650,"linepay":5625,"jkopay":3425,"easycard":1980},"note":"[匯入] 營業額23680"},{"id":"imp_2026-01-05_exp_食材進貨","date":"2026-01-05","type":"expense","cat":"food","amount":8290,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-05_exp_其他支出","date":"2026-01-05","type":"expense","cat":"misc","amount":480,"note":"[匯入] 其他支出 11412員工薪資118515 高麗菜一批3167 桌邊掃碼貼紙印刷370"},{"id":"imp_2026-01-06_inc","date":"2026-01-06","type":"income","pays":{"cash":15055,"linepay":4991,"jkopay":2555,"easycard":1030},"note":"[匯入] 營業額23631"},{"id":"imp_2026-01-06_exp_食材進貨","date":"2026-01-06","type":"expense","cat":"food","amount":8190,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-06_exp_其他支出","date":"2026-01-06","type":"expense","cat":"misc","amount":1260,"note":"[匯入] 其他支出"},{"id":"imp_2026-01-06_exp_瓦斯","date":"2026-01-06","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-01-07_inc","date":"2026-01-07","type":"income","pays":{"cash":14505,"linepay":3540,"jkopay":1965,"easycard":790},"note":"[匯入] 營業額20800"},{"id":"imp_2026-01-07_exp_食材進貨","date":"2026-01-07","type":"expense","cat":"food","amount":6950,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-07_exp_電費","date":"2026-01-07","type":"expense","cat":"fixed","amount":9704,"note":"[匯入] 電費"},{"id":"imp_2026-01-07_exp_電話網路","date":"2026-01-07","type":"expense","cat":"fixed","amount":999,"note":"[匯入] 電話網路"},{"id":"imp_2026-01-08_inc","date":"2026-01-08","type":"income","pays":{"cash":10544,"linepay":2950,"jkopay":1295,"easycard":1495},"note":"[匯入] 營業額16284"},{"id":"imp_2026-01-08_exp_食材進貨","date":"2026-01-08","type":"expense","cat":"food","amount":11972,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-08_exp_其他支出","date":"2026-01-08","type":"expense","cat":"misc","amount":56,"note":"[匯入] 其他支出"},{"id":"imp_2026-01-09_inc","date":"2026-01-09","type":"income","pays":{"cash":12557,"linepay":7295,"jkopay":890,"easycard":495},"note":"[匯入] 營業額21237"},{"id":"imp_2026-01-09_exp_食材進貨","date":"2026-01-09","type":"expense","cat":"food","amount":1373,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-09_exp_進貨匯款","date":"2026-01-09","type":"expense","cat":"food","amount":6600,"note":"[匯入] 進貨匯款"},{"id":"imp_2026-01-12_inc","date":"2026-01-12","type":"income","pays":{"cash":10856,"linepay":10736,"jkopay":2075,"easycard":1295},"note":"[匯入] 營業額24962"},{"id":"imp_2026-01-12_exp_食材進貨","date":"2026-01-12","type":"expense","cat":"food","amount":1561,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-12_exp_其他支出","date":"2026-01-12","type":"expense","cat":"misc","amount":366,"note":"[匯入] 其他支出 標籤貼紙機6500"},{"id":"imp_2026-01-13_inc","date":"2026-01-13","type":"income","pays":{"cash":11870,"linepay":12245,"jkopay":1930,"easycard":1345},"note":"[匯入] 營業額27390"},{"id":"imp_2026-01-13_exp_食材進貨","date":"2026-01-13","type":"expense","cat":"food","amount":9245,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-13_exp_其他支出","date":"2026-01-13","type":"expense","cat":"misc","amount":490,"note":"[匯入] 其他支出 12月份聚餐餐費10431 營業稅5040"},{"id":"imp_2026-01-13_exp_非常態性支出","date":"2026-01-13","type":"expense","cat":"misc","amount":10431,"note":"[匯入] 非常態性支出"},{"id":"imp_2026-01-14_inc","date":"2026-01-14","type":"income","pays":{"cash":19070,"linepay":8915,"jkopay":1380,"easycard":310},"note":"[匯入] 營業額29675"},{"id":"imp_2026-01-14_exp_食材進貨","date":"2026-01-14","type":"expense","cat":"food","amount":19660,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-14_exp_其他支出","date":"2026-01-14","type":"expense","cat":"misc","amount":1366,"note":"[匯入] 其他支出"},{"id":"imp_2026-01-14_exp_瓦斯","date":"2026-01-14","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-01-15_inc","date":"2026-01-15","type":"income","pays":{"cash":7770,"linepay":12801,"jkopay":465,"easycard":530},"note":"[匯入] 營業額21566"},{"id":"imp_2026-01-15_exp_食材進貨","date":"2026-01-15","type":"expense","cat":"food","amount":4212,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-15_exp_其他支出","date":"2026-01-15","type":"expense","cat":"misc","amount":80,"note":"[匯入] 其他支出 健保費3654"},{"id":"imp_2026-01-15_exp_勞健保勞退","date":"2026-01-15","type":"expense","cat":"staff","amount":3654,"note":"[匯入] 勞健保勞退"},{"id":"imp_2026-01-16_inc","date":"2026-01-16","type":"income","pays":{"cash":13685,"linepay":10495,"jkopay":150,"easycard":335},"note":"[匯入] 營業額24665"},{"id":"imp_2026-01-16_exp_食材進貨","date":"2026-01-16","type":"expense","cat":"food","amount":11229,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-16_exp_其他支出","date":"2026-01-16","type":"expense","cat":"misc","amount":1180,"note":"[匯入] 其他支出 +攤位租金12000"},{"id":"imp_2026-01-19_inc","date":"2026-01-19","type":"income","pays":{"cash":8781,"linepay":16636,"jkopay":1052,"easycard":1185},"note":"[匯入] 營業額27654"},{"id":"imp_2026-01-19_exp_食材進貨","date":"2026-01-19","type":"expense","cat":"food","amount":609,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-19_exp_其他支出","date":"2026-01-19","type":"expense","cat":"misc","amount":337,"note":"[匯入] 其他支出 美食家月結24475＋匯費15 11412市話費1290"},{"id":"imp_2026-01-19_exp_電話網路","date":"2026-01-19","type":"expense","cat":"fixed","amount":1290,"note":"[匯入] 電話網路"},{"id":"imp_2026-01-20_inc","date":"2026-01-20","type":"income","pays":{"cash":17009,"linepay":7075,"jkopay":1650,"easycard":1725},"note":"[匯入] 營業額27459"},{"id":"imp_2026-01-20_exp_食材進貨","date":"2026-01-20","type":"expense","cat":"food","amount":9815,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-20_exp_其他支出","date":"2026-01-20","type":"expense","cat":"misc","amount":1400,"note":"[匯入] 其他支出 高麗菜一批2435"},{"id":"imp_2026-01-20_exp_瓦斯","date":"2026-01-20","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-01-21_inc","date":"2026-01-21","type":"income","pays":{"cash":15857,"linepay":7905,"jkopay":770,"easycard":985},"note":"[匯入] 營業額25517"},{"id":"imp_2026-01-21_exp_食材進貨","date":"2026-01-21","type":"expense","cat":"food","amount":20268,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-21_exp_其他支出","date":"2026-01-21","type":"expense","cat":"misc","amount":346,"note":"[匯入] 其他支出"},{"id":"imp_2026-01-22_inc","date":"2026-01-22","type":"income","pays":{"cash":12620,"linepay":15240,"jkopay":1655,"easycard":335},"note":"[匯入] 營業額29850"},{"id":"imp_2026-01-22_exp_食材進貨","date":"2026-01-22","type":"expense","cat":"food","amount":8300,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-22_exp_其他支出","date":"2026-01-22","type":"expense","cat":"misc","amount":120,"note":"[匯入] 其他支出"},{"id":"imp_2026-01-23_inc","date":"2026-01-23","type":"income","pays":{"cash":15875,"linepay":6750,"jkopay":400,"easycard":795},"note":"[匯入] 營業額23820"},{"id":"imp_2026-01-23_exp_食材進貨","date":"2026-01-23","type":"expense","cat":"food","amount":2000,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-23_exp_其他支出","date":"2026-01-23","type":"expense","cat":"misc","amount":396,"note":"[匯入] 其他支出"},{"id":"imp_2026-01-26_inc","date":"2026-01-26","type":"income","pays":{"cash":19345,"linepay":11010,"jkopay":3820,"easycard":150},"note":"[匯入] 營業額34325"},{"id":"imp_2026-01-26_exp_食材進貨","date":"2026-01-26","type":"expense","cat":"food","amount":11585,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-26_exp_進貨匯款","date":"2026-01-26","type":"expense","cat":"food","amount":2240,"note":"[匯入] 進貨匯款"},{"id":"imp_2026-01-26_exp_其他支出","date":"2026-01-26","type":"expense","cat":"misc","amount":240,"note":"[匯入] 其他支出 便當盒貼紙2240＋運費20"},{"id":"imp_2026-01-27_inc","date":"2026-01-27","type":"income","pays":{"cash":15710,"linepay":8305,"jkopay":7460,"easycard":510},"note":"[匯入] 營業額31985"},{"id":"imp_2026-01-27_exp_食材進貨","date":"2026-01-27","type":"expense","cat":"food","amount":7600,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-27_exp_其他支出","date":"2026-01-27","type":"expense","cat":"misc","amount":499,"note":"[匯入] 其他支出"},{"id":"imp_2026-01-28_inc","date":"2026-01-28","type":"income","pays":{"cash":14606,"linepay":11275,"jkopay":2695,"easycard":150},"note":"[匯入] 營業額28726"},{"id":"imp_2026-01-28_exp_食材進貨","date":"2026-01-28","type":"expense","cat":"food","amount":15271,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-28_exp_其他支出","date":"2026-01-28","type":"expense","cat":"misc","amount":1530,"note":"[匯入] 其他支出 偉良11.12月雞蛋15260＋手續費15"},{"id":"imp_2026-01-28_exp_瓦斯","date":"2026-01-28","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-01-29_inc","date":"2026-01-29","type":"income","pays":{"cash":15520,"linepay":15425,"jkopay":770,"easycard":755},"note":"[匯入] 營業額32470"},{"id":"imp_2026-01-29_exp_食材進貨","date":"2026-01-29","type":"expense","cat":"food","amount":12500,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-29_exp_其他支出","date":"2026-01-29","type":"expense","cat":"misc","amount":997,"note":"[匯入] 其他支出"},{"id":"imp_2026-01-30_inc","date":"2026-01-30","type":"income","pays":{"cash":9520,"linepay":12600,"jkopay":1175,"easycard":730},"note":"[匯入] 營業額24025"},{"id":"imp_2026-01-30_exp_食材進貨","date":"2026-01-30","type":"expense","cat":"food","amount":5668,"note":"[匯入] 食材進貨"},{"id":"imp_2026-01-30_exp_其他支出","date":"2026-01-30","type":"expense","cat":"misc","amount":276,"note":"[匯入] 其他支出 11411勞保費5093 勞保滯納金40 11501中興保全1805"},{"id":"imp_2026-01-30_exp_勞健保勞退","date":"2026-01-30","type":"expense","cat":"staff","amount":5133,"note":"[匯入] 勞健保勞退"},{"id":"imp_2026-02-01_exp_進貨匯款","date":"2026-02-01","type":"expense","cat":"food","amount":6600,"note":"[匯入] 進貨匯款"},{"id":"imp_2026-02-02_inc","date":"2026-02-02","type":"income","pays":{"cash":9815,"linepay":11610,"jkopay":1195,"easycard":215},"note":"[匯入] 營業額22835"},{"id":"imp_2026-02-02_exp_食材進貨","date":"2026-02-02","type":"expense","cat":"food","amount":4320,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-02_exp_其他支出","date":"2026-02-02","type":"expense","cat":"misc","amount":180,"note":"[匯入] 其他支出"},{"id":"imp_2026-02-03_inc","date":"2026-02-03","type":"income","pays":{"cash":15715,"linepay":11130,"jkopay":790,"easycard":800},"note":"[匯入] 營業額28435"},{"id":"imp_2026-02-03_exp_食材進貨","date":"2026-02-03","type":"expense","cat":"food","amount":9962,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-03_exp_其他支出","date":"2026-02-03","type":"expense","cat":"misc","amount":700,"note":"[匯入] 其他支出"},{"id":"imp_2026-02-04_inc","date":"2026-02-04","type":"income","pays":{"cash":16975,"linepay":7515,"jkopay":300,"easycard":595},"note":"[匯入] 營業額25385"},{"id":"imp_2026-02-04_exp_食材進貨","date":"2026-02-04","type":"expense","cat":"food","amount":8500,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-04_exp_其他支出","date":"2026-02-04","type":"expense","cat":"misc","amount":1389,"note":"[匯入] 其他支出 高麗菜一批3049"},{"id":"imp_2026-02-04_exp_瓦斯","date":"2026-02-04","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-02-05_inc","date":"2026-02-05","type":"income","pays":{"cash":7776,"linepay":11165,"jkopay":1305,"easycard":1130},"note":"[匯入] 營業額21376"},{"id":"imp_2026-02-05_exp_食材進貨","date":"2026-02-05","type":"expense","cat":"food","amount":14068,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-05_exp_其他支出","date":"2026-02-05","type":"expense","cat":"misc","amount":960,"note":"[匯入] 其他支出 11501員工薪資118558 多匯騏紘749 音樂月租231 高壓水槍6057"},{"id":"imp_2026-02-05_exp_電話網路","date":"2026-02-05","type":"expense","cat":"fixed","amount":231,"note":"[匯入] 電話網路"},{"id":"imp_2026-02-05_exp_非常態性支出","date":"2026-02-05","type":"expense","cat":"misc","amount":600,"note":"[匯入] 非常態性支出"},{"id":"imp_2026-02-06_inc","date":"2026-02-06","type":"income","pays":{"cash":7670,"linepay":4270,"jkopay":590,"easycard":90},"note":"[匯入] 營業額12620"},{"id":"imp_2026-02-09_inc","date":"2026-02-09","type":"income","pays":{"cash":20835,"linepay":7235,"jkopay":1770,"easycard":1560},"note":"[匯入] 營業額31400"},{"id":"imp_2026-02-09_exp_食材進貨","date":"2026-02-09","type":"expense","cat":"food","amount":5960,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-09_exp_其他支出","date":"2026-02-09","type":"expense","cat":"misc","amount":369,"note":"[匯入] 其他支出 店機月租199"},{"id":"imp_2026-02-09_exp_電話網路","date":"2026-02-09","type":"expense","cat":"fixed","amount":199,"note":"[匯入] 電話網路"},{"id":"imp_2026-02-10_inc","date":"2026-02-10","type":"income","pays":{"cash":13871,"linepay":8845,"jkopay":465,"easycard":615},"note":"[匯入] 營業額23796"},{"id":"imp_2026-02-10_exp_食材進貨","date":"2026-02-10","type":"expense","cat":"food","amount":9450,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-10_exp_其他支出","date":"2026-02-10","type":"expense","cat":"misc","amount":220,"note":"[匯入] 其他支出 11411勞退2147 11501網路費999"},{"id":"imp_2026-02-10_exp_勞健保勞退","date":"2026-02-10","type":"expense","cat":"staff","amount":2147,"note":"[匯入] 勞健保勞退"},{"id":"imp_2026-02-10_exp_電話網路","date":"2026-02-10","type":"expense","cat":"fixed","amount":999,"note":"[匯入] 電話網路"},{"id":"imp_2026-02-11_inc","date":"2026-02-11","type":"income","pays":{"cash":15640,"linepay":8456,"jkopay":505,"easycard":670},"note":"[匯入] 營業額25271"},{"id":"imp_2026-02-11_exp_食材進貨","date":"2026-02-11","type":"expense","cat":"food","amount":3830,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-11_exp_其他支出","date":"2026-02-11","type":"expense","cat":"misc","amount":2190,"note":"[匯入] 其他支出"},{"id":"imp_2026-02-12_inc","date":"2026-02-12","type":"income","pays":{"cash":9045,"linepay":8710,"jkopay":2490,"easycard":1165},"note":"[匯入] 營業額21410"},{"id":"imp_2026-02-12_exp_食材進貨","date":"2026-02-12","type":"expense","cat":"food","amount":2279,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-12_exp_其他支出","date":"2026-02-12","type":"expense","cat":"misc","amount":6164,"note":"[匯入] 其他支出"},{"id":"imp_2026-02-13_exp_電費","date":"2026-02-13","type":"expense","cat":"fixed","amount":6381,"note":"[匯入] 電費"},{"id":"imp_2026-02-23_inc","date":"2026-02-23","type":"income","pays":{"cash":6670,"linepay":9540,"jkopay":1380,"easycard":480},"note":"[匯入] 營業額18070"},{"id":"imp_2026-02-23_exp_食材進貨","date":"2026-02-23","type":"expense","cat":"food","amount":12028,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-23_exp_其他支出","date":"2026-02-23","type":"expense","cat":"misc","amount":4285,"note":"[匯入] 其他支出 高麗菜一批1834 美食家月結20765＋手續費15"},{"id":"imp_2026-02-23_exp_瓦斯","date":"2026-02-23","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-02-24_inc","date":"2026-02-24","type":"income","pays":{"cash":12120,"linepay":4990,"jkopay":460,"easycard":325},"note":"[匯入] 營業額17895"},{"id":"imp_2026-02-24_exp_食材進貨","date":"2026-02-24","type":"expense","cat":"food","amount":1665,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-24_exp_其他支出","date":"2026-02-24","type":"expense","cat":"misc","amount":926,"note":"[匯入] 其他支出"},{"id":"imp_2026-02-25_exp_其他支出","date":"2026-02-25","type":"expense","cat":"misc","amount":5200,"note":"[匯入] 其他支出 市話話費1347"},{"id":"imp_2026-02-25_exp_電話網路","date":"2026-02-25","type":"expense","cat":"fixed","amount":1347,"note":"[匯入] 電話網路"},{"id":"imp_2026-02-27_exp_食材進貨","date":"2026-02-27","type":"expense","cat":"food","amount":3348,"note":"[匯入] 食材進貨"},{"id":"imp_2026-02-28_exp_食材進貨","date":"2026-02-28","type":"expense","cat":"food","amount":3000,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-02_inc","date":"2026-03-02","type":"income","pays":{"cash":13755,"linepay":8994,"jkopay":1255,"easycard":1645},"note":"[匯入] 營業額25649"},{"id":"imp_2026-03-02_exp_食材進貨","date":"2026-03-02","type":"expense","cat":"food","amount":6855,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-02_exp_其他支出","date":"2026-03-02","type":"expense","cat":"misc","amount":338,"note":"[匯入] 其他支出"},{"id":"imp_2026-03-03_inc","date":"2026-03-03","type":"income","pays":{"cash":7620,"linepay":13633,"jkopay":915,"easycard":1935},"note":"[匯入] 營業額24103"},{"id":"imp_2026-03-03_exp_食材進貨","date":"2026-03-03","type":"expense","cat":"food","amount":5977,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-03_exp_其他支出","date":"2026-03-03","type":"expense","cat":"misc","amount":4015,"note":"[匯入] 其他支出 高麗菜一批1771"},{"id":"imp_2026-03-03_exp_瓦斯","date":"2026-03-03","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-03-03_exp_非常態性支出","date":"2026-03-03","type":"expense","cat":"misc","amount":2000,"note":"[匯入] 非常態性支出"},{"id":"imp_2026-03-04_inc","date":"2026-03-04","type":"income","pays":{"cash":9695,"linepay":8030,"jkopay":765,"easycard":2185},"note":"[匯入] 營業額20675"},{"id":"imp_2026-03-04_exp_食材進貨","date":"2026-03-04","type":"expense","cat":"food","amount":5400,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-04_exp_進貨匯款","date":"2026-03-04","type":"expense","cat":"food","amount":22080,"note":"[匯入] 進貨匯款"},{"id":"imp_2026-03-04_exp_其他支出","date":"2026-03-04","type":"expense","cat":"misc","amount":880,"note":"[匯入] 其他支出 11502中興保全1805 11412勞保4571 11412勞退1953 牛肉一批12240 餐盒一批9840"},{"id":"imp_2026-03-04_exp_勞健保勞退","date":"2026-03-04","type":"expense","cat":"staff","amount":6524,"note":"[匯入] 勞健保勞退"},{"id":"imp_2026-03-05_inc","date":"2026-03-05","type":"income","pays":{"cash":10021,"linepay":10070,"jkopay":675,"easycard":760},"note":"[匯入] 營業額21526"},{"id":"imp_2026-03-05_exp_食材進貨","date":"2026-03-05","type":"expense","cat":"food","amount":3880,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-05_exp_其他支出","date":"2026-03-05","type":"expense","cat":"misc","amount":1225,"note":"[匯入] 其他支出 11502員工薪資84787"},{"id":"imp_2026-03-05_exp_非常態性支出","date":"2026-03-05","type":"expense","cat":"misc","amount":258,"note":"[匯入] 非常態性支出"},{"id":"imp_2026-03-06_inc","date":"2026-03-06","type":"income","pays":{"cash":10250,"linepay":7505,"jkopay":935,"easycard":760},"note":"[匯入] 營業額19450"},{"id":"imp_2026-03-06_exp_食材進貨","date":"2026-03-06","type":"expense","cat":"food","amount":5629,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-06_exp_其他支出","date":"2026-03-06","type":"expense","cat":"misc","amount":734,"note":"[匯入] 其他支出"},{"id":"imp_2026-03-09_inc","date":"2026-03-09","type":"income","pays":{"cash":8995,"linepay":8835,"jkopay":475,"easycard":1770},"note":"[匯入] 營業額20075"},{"id":"imp_2026-03-09_exp_食材進貨","date":"2026-03-09","type":"expense","cat":"food","amount":3490,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-09_exp_其他支出","date":"2026-03-09","type":"expense","cat":"misc","amount":4130,"note":"[匯入] 其他支出"},{"id":"imp_2026-03-09_exp_非常態性支出","date":"2026-03-09","type":"expense","cat":"misc","amount":3000,"note":"[匯入] 非常態性支出"},{"id":"imp_2026-03-10_inc","date":"2026-03-10","type":"income","pays":{"cash":12761,"linepay":8665,"jkopay":1020,"easycard":1605},"note":"[匯入] 營業額24051"},{"id":"imp_2026-03-10_exp_食材進貨","date":"2026-03-10","type":"expense","cat":"food","amount":7495,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-10_exp_其他支出","date":"2026-03-10","type":"expense","cat":"misc","amount":1781,"note":"[匯入] 其他支出"},{"id":"imp_2026-03-10_exp_瓦斯","date":"2026-03-10","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-03-11_inc","date":"2026-03-11","type":"income","pays":{"cash":10448,"linepay":11335,"jkopay":1885,"easycard":2115},"note":"[匯入] 營業額25783"},{"id":"imp_2026-03-11_exp_食材進貨","date":"2026-03-11","type":"expense","cat":"food","amount":5509,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-11_exp_其他支出","date":"2026-03-11","type":"expense","cat":"misc","amount":250,"note":"[匯入] 其他支出 11502網路費999"},{"id":"imp_2026-03-11_exp_電話網路","date":"2026-03-11","type":"expense","cat":"fixed","amount":999,"note":"[匯入] 電話網路"},{"id":"imp_2026-03-12_inc","date":"2026-03-12","type":"income","pays":{"cash":9258,"linepay":9545,"jkopay":2980,"easycard":1000},"note":"[匯入] 營業額22783"},{"id":"imp_2026-03-12_exp_食材進貨","date":"2026-03-12","type":"expense","cat":"food","amount":6685,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-12_exp_其他支出","date":"2026-03-12","type":"expense","cat":"misc","amount":375,"note":"[匯入] 其他支出 店機話費407"},{"id":"imp_2026-03-12_exp_電話網路","date":"2026-03-12","type":"expense","cat":"fixed","amount":407,"note":"[匯入] 電話網路"},{"id":"imp_2026-03-13_inc","date":"2026-03-13","type":"income","pays":{"cash":8430,"linepay":6990,"jkopay":5395,"easycard":0},"note":"[匯入] 營業額20815"},{"id":"imp_2026-03-13_exp_食材進貨","date":"2026-03-13","type":"expense","cat":"food","amount":3820,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-13_exp_其他支出","date":"2026-03-13","type":"expense","cat":"misc","amount":1490,"note":"[匯入] 其他支出"},{"id":"imp_2026-03-13_exp_瓦斯","date":"2026-03-13","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-03-16_inc","date":"2026-03-16","type":"income","pays":{"cash":9402,"linepay":10510,"jkopay":2405,"easycard":1465},"note":"[匯入] 營業額23782"},{"id":"imp_2026-03-16_exp_食材進貨","date":"2026-03-16","type":"expense","cat":"food","amount":10832,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-16_exp_其他支出","date":"2026-03-16","type":"expense","cat":"misc","amount":6589,"note":"[匯入] 其他支出 健保費1886"},{"id":"imp_2026-03-16_exp_勞健保勞退","date":"2026-03-16","type":"expense","cat":"staff","amount":1886,"note":"[匯入] 勞健保勞退"},{"id":"imp_2026-03-16_exp_電費","date":"2026-03-16","type":"expense","cat":"fixed","amount":5763,"note":"[匯入] 電費"},{"id":"imp_2026-03-17_inc","date":"2026-03-17","type":"income","pays":{"cash":9280,"linepay":11680,"jkopay":3770,"easycard":465},"note":"[匯入] 營業額25195"},{"id":"imp_2026-03-17_exp_食材進貨","date":"2026-03-17","type":"expense","cat":"food","amount":7878,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-17_exp_其他支出","date":"2026-03-17","type":"expense","cat":"misc","amount":2520,"note":"[匯入] 其他支出 租金81500＋手續費15 美食家月結9930 +攤位租金12000"},{"id":"imp_2026-03-18_inc","date":"2026-03-18","type":"income","pays":{"cash":14675,"linepay":10105,"jkopay":1330,"easycard":500},"note":"[匯入] 營業額26610"},{"id":"imp_2026-03-18_exp_食材進貨","date":"2026-03-18","type":"expense","cat":"food","amount":8940,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-18_exp_其他支出","date":"2026-03-18","type":"expense","cat":"misc","amount":245,"note":"[匯入] 其他支出"},{"id":"imp_2026-03-19_inc","date":"2026-03-19","type":"income","pays":{"cash":8196,"linepay":10166,"jkopay":735,"easycard":635},"note":"[匯入] 營業額19732"},{"id":"imp_2026-03-19_exp_食材進貨","date":"2026-03-19","type":"expense","cat":"food","amount":6286,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-19_exp_其他支出","date":"2026-03-19","type":"expense","cat":"misc","amount":420,"note":"[匯入] 其他支出"},{"id":"imp_2026-03-20_inc","date":"2026-03-20","type":"income","pays":{"cash":9256,"linepay":11830,"jkopay":325,"easycard":1080},"note":"[匯入] 營業額22491"},{"id":"imp_2026-03-20_exp_食材進貨","date":"2026-03-20","type":"expense","cat":"food","amount":1830,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-20_exp_進貨匯款","date":"2026-03-20","type":"expense","cat":"food","amount":8577,"note":"[匯入] 進貨匯款"},{"id":"imp_2026-03-20_exp_其他支出","date":"2026-03-20","type":"expense","cat":"misc","amount":1516,"note":"[匯入] 其他支出 美牛阪腱1件8577 高麗菜一批2002"},{"id":"imp_2026-03-20_exp_瓦斯","date":"2026-03-20","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-03-23_inc","date":"2026-03-23","type":"income","pays":{"cash":15802,"linepay":9960,"jkopay":1070,"easycard":1310},"note":"[匯入] 營業額28142"},{"id":"imp_2026-03-23_exp_食材進貨","date":"2026-03-23","type":"expense","cat":"food","amount":5650,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-23_exp_其他支出","date":"2026-03-23","type":"expense","cat":"misc","amount":270,"note":"[匯入] 其他支出 市話費1103"},{"id":"imp_2026-03-23_exp_電話網路","date":"2026-03-23","type":"expense","cat":"fixed","amount":1103,"note":"[匯入] 電話網路"},{"id":"imp_2026-03-24_inc","date":"2026-03-24","type":"income","pays":{"cash":13060,"linepay":11360,"jkopay":1640,"easycard":555},"note":"[匯入] 營業額26615"},{"id":"imp_2026-03-24_exp_食材進貨","date":"2026-03-24","type":"expense","cat":"food","amount":11143,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-24_exp_其他支出","date":"2026-03-24","type":"expense","cat":"misc","amount":320,"note":"[匯入] 其他支出"},{"id":"imp_2026-03-25_inc","date":"2026-03-25","type":"income","pays":{"cash":10535,"linepay":9875,"jkopay":1275,"easycard":410},"note":"[匯入] 營業額22095"},{"id":"imp_2026-03-25_exp_食材進貨","date":"2026-03-25","type":"expense","cat":"food","amount":13320,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-25_exp_其他支出","date":"2026-03-25","type":"expense","cat":"misc","amount":1530,"note":"[匯入] 其他支出 淘寶營業用品一批9483"},{"id":"imp_2026-03-25_exp_瓦斯","date":"2026-03-25","type":"expense","cat":"fixed","amount":1200,"note":"[匯入] 瓦斯"},{"id":"imp_2026-03-26_inc","date":"2026-03-26","type":"income","pays":{"cash":16360,"linepay":12546,"jkopay":1245,"easycard":1445},"note":"[匯入] 營業額31596"},{"id":"imp_2026-03-26_exp_食材進貨","date":"2026-03-26","type":"expense","cat":"food","amount":6419,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-26_exp_其他支出","date":"2026-03-26","type":"expense","cat":"misc","amount":410,"note":"[匯入] 其他支出 11502電費2314"},{"id":"imp_2026-03-26_exp_電費","date":"2026-03-26","type":"expense","cat":"fixed","amount":2314,"note":"[匯入] 電費"},{"id":"imp_2026-03-27_inc","date":"2026-03-27","type":"income","pays":{"cash":7069,"linepay":4140,"jkopay":615,"easycard":340},"note":"[匯入] 營業額12164"},{"id":"imp_2026-03-27_exp_食材進貨","date":"2026-03-27","type":"expense","cat":"food","amount":4360,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-27_exp_其他支出","date":"2026-03-27","type":"expense","cat":"misc","amount":270,"note":"[匯入] 其他支出 11501勞保費3357 11411勞保滯納金69"},{"id":"imp_2026-03-27_exp_勞健保勞退","date":"2026-03-27","type":"expense","cat":"staff","amount":3426,"note":"[匯入] 勞健保勞退"},{"id":"imp_2026-03-30_inc","date":"2026-03-30","type":"income","pays":{"cash":23306,"linepay":7090,"jkopay":0,"easycard":750},"note":"[匯入] 營業額31146"},{"id":"imp_2026-03-30_exp_食材進貨","date":"2026-03-30","type":"expense","cat":"food","amount":5868,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-30_exp_其他支出","date":"2026-03-30","type":"expense","cat":"misc","amount":5617,"note":"[匯入] 其他支出"},{"id":"imp_2026-03-31_inc","date":"2026-03-31","type":"income","pays":{"cash":11288,"linepay":12769,"jkopay":975,"easycard":1425},"note":"[匯入] 營業額26457"},{"id":"imp_2026-03-31_exp_食材進貨","date":"2026-03-31","type":"expense","cat":"food","amount":6840,"note":"[匯入] 食材進貨"},{"id":"imp_2026-03-31_exp_其他支出","date":"2026-03-31","type":"expense","cat":"misc","amount":300,"note":"[匯入] 其他支出 11412健保費"},{"id":"imp_2026-03-31_exp_勞健保勞退","date":"2026-03-31","type":"expense","cat":"staff","amount":1830,"note":"[匯入] 勞健保勞退"},{"id":"imp_2026-03-31_exp_非常態性支出","date":"2026-03-31","type":"expense","cat":"misc","amount":3445,"note":"[匯入] 非常態性支出"}]</textarea>
+
+<script>
+// 錯誤攔截，顯示在頁面上
+window.onerror = function(msg, src, line, col, err) {
+  var d = document.createElement('div');
+  d.style = 'position:fixed;top:0;left:0;right:0;background:#c62828;color:#fff;padding:12px;font-size:13px;z-index:9999;';
+  d.textContent = 'JS錯誤 第' + line + '行: ' + msg;
+  document.body.appendChild(d);
+  return false;
+};
+
+var REC = 'sy_rec', PCK = 'sy_pay', ECK = 'sy_exp';
+var COLORS = ['#4caf50','#2196f3','#9c27b0','#ff9800','#e91e63','#00bcd4','#795548','#607d8b','#f44336','#3f51b5'];
+var DEF_PAY = [
+  {id:'cash',    name:'現金',    color:'#4caf50'},
+  {id:'linepay', name:'Line Pay',color:'#2196f3'},
+  {id:'jkopay',  name:'街口支付',color:'#9c27b0'},
+  {id:'easycard',name:'悠遊卡',  color:'#ff9800'}
+];
+var DEF_EXP = [
+  {id:'food', name:'食材／進貨',  color:'#ff9800'},
+  {id:'staff',name:'員工薪資',    color:'#f44336'},
+  {id:'fixed',name:'固定費用',    color:'#607d8b'},
+  {id:'misc', name:'零用金／雜支',color:'#795548'}
+];
+var records = [], payCats = [], expCats = [], selPC = COLORS[0], selEC = COLORS[0];
+
+var API = 'https://script.google.com/macros/s/AKfycbwicwSWLGZivIVMtrVMmJx2ORJ0G-SFhGC5rPtbSIQgToCKgfKcq2wbxv2AzNVf_7Wg/exec';
+
+function showLoading(on) {
+  document.getElementById('loading-bar').style.display = on ? 'block' : 'none';
+}
+function showToast(msg, ok) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = ok === false ? '#c62828' : '#323232';
+  t.style.display = 'block';
+  setTimeout(function(){ t.style.display = 'none'; }, 2500);
+}
+function setSyncStatus(msg) {
+  var el = document.getElementById('sync-status');
+  if (el) el.textContent = msg;
+}
+
+function apiGet(params, cb) {
+  var url = API + '?' + Object.keys(params).map(function(k){ return k + '=' + encodeURIComponent(params[k]); }).join('&');
+  showLoading(true);
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(data){ showLoading(false); cb(null, data); })
+    .catch(function(err){ showLoading(false); cb(err); });
+}
+
+function apiPost(body, cb) {
+  showLoading(true);
+  fetch(API, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(data){ showLoading(false); cb(null, data); })
+    .catch(function(err){ showLoading(false); cb(err); });
+}
+
+function load() {
+  setSyncStatus('⏳ 同步中...');
+  apiGet({action:'getCats'}, function(err, data) {
+    if (err || !data.ok) {
+      // 雲端失敗，用預設值
+      payCats = DEF_PAY.map(function(x){ return {id:x.id,name:x.name,color:x.color}; });
+      expCats = DEF_EXP.map(function(x){ return {id:x.id,name:x.name,color:x.color}; });
+      setSyncStatus('⚠️ 類別載入失敗，使用預設值');
+    } else {
+      payCats = (data.payCats && data.payCats.length) ? data.payCats : DEF_PAY.map(function(x){ return {id:x.id,name:x.name,color:x.color}; });
+      expCats = (data.expCats && data.expCats.length) ? data.expCats : DEF_EXP.map(function(x){ return {id:x.id,name:x.name,color:x.color}; });
+    }
+    renderPayInputs();
+    renderExpSelect();
+    loadRecords();
+  });
+}
+
+function loadRecords() {
+  apiGet({action:'getRecords'}, function(err, data) {
+    if (err || !data.ok) {
+      setSyncStatus('⚠️ 記錄載入失敗');
+      showToast('載入失敗，請重新整理', false);
+      return;
+    }
+    records = data.data || [];
+    var now = new Date();
+    var ts = now.getHours() + ':' + String(now.getMinutes()).padStart(2,'0');
+    setSyncStatus('✅ 已同步 ' + ts + '　共 ' + records.length + ' 筆');
+    renderTodayList();
+    updateSum();
+  });
+}
+
+function saveR() { /* 雲端版不用本地存 */ }
+function saveP() {
+  apiPost({action:'saveCats', payCats:payCats, expCats:expCats}, function(err, data){
+    if (err || !data.ok) { showToast('類別儲存失敗', false); return; }
+    showToast('類別已儲存');
+  });
+}
+function saveE() { saveP(); }
+function fmt(n) { return '$' + Math.round(n).toLocaleString(); }
+function uid() { return 'u' + Date.now() + Math.random().toString(36).slice(2,5); }
+function gd() { return document.getElementById('entry-date').value; }
+
+function importHistorical() {
+  try {
+    var jsonStr = document.getElementById('historical-json').value;
+    var data = JSON.parse(jsonStr);
+    var btn = document.getElementById('imp-btn');
+    var notice = document.getElementById('imp-notice');
+    btn.disabled = true;
+    btn.textContent = '⏳ 匯入中，請稍候...';
+    notice.textContent = '正在上傳資料到 Google 試算表，請勿關閉頁面...';
+    apiPost({action:'importRecords', records:data}, function(err, res){
+      if (err || !res.ok) {
+        btn.disabled = false;
+        btn.textContent = '📥 匯入 1～3月 歷史資料';
+        notice.textContent = '匯入失敗：' + (err ? err.message : '請重試');
+        notice.style.background = '#ffcdd2';
+        return;
+      }
+      btn.textContent = '✅ 已匯入 ' + res.added + ' 筆完成';
+      btn.style.background = '#388e3c';
+      notice.innerHTML = '<b>✅ 匯入完成！</b>新增 <b>' + res.added + '</b> 筆已上傳到 Google 試算表。';
+      notice.style.background = '#e8f5e9';
+      notice.style.borderColor = '#66bb6a';
+      notice.style.color = '#1b5e20';
+      loadRecords();
+    });
+  } catch(e) {
+    document.getElementById('imp-notice').textContent = '匯入失敗：' + e.message;
+    document.getElementById('imp-notice').style.background = '#ffcdd2';
+  }
+}
+
+function sw(tab) {
+  ['entry','history','summary','settings'].forEach(function(id) {
+    document.getElementById('tab-'+id).classList.toggle('active', id===tab);
+    document.getElementById('page-'+id).classList.toggle('active', id===tab);
+  });
+  if (tab === 'history') renderHistory();
+  if (tab === 'summary') renderSummary();
+  if (tab === 'settings') renderSettings();
+}
+
+function setToday() {
+  var d = new Date();
+  document.getElementById('entry-date').value =
+    d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  renderTodayList(); updateSum();
+}
+
+function renderPayInputs() {
+  var html = '<div class="pgrid">';
+  payCats.forEach(function(p) {
+    html += '<div class="fld"><label>'
+      + '<span style="width:9px;height:9px;border-radius:50%;background:' + p.color + ';display:inline-block;margin-right:4px;"></span>'
+      + p.name + '</label>'
+      + '<input type="number" id="pay-' + p.id + '" placeholder="0" min="0"></div>';
+  });
+  html += '</div>';
+  document.getElementById('pay-inputs').innerHTML = html;
+}
+
+function renderExpSelect() {
+  document.getElementById('exp-cat').innerHTML =
+    expCats.map(function(e) { return '<option value="' + e.id + '">' + e.name + '</option>'; }).join('');
+}
+
+function incTotal(r) {
+  return payCats.reduce(function(s,p) { return s + ((r.pays && r.pays[p.id]) || 0); }, 0);
+}
+
+function addIncome() {
+  var date = gd(); if (!date) { alert('請先選擇日期'); return; }
+  var pays = {}, total = 0;
+  payCats.forEach(function(p) {
+    var el = document.getElementById('pay-' + p.id);
+    var v = el ? (parseFloat(el.value) || 0) : 0;
+    pays[p.id] = v; total += v;
+  });
+  if (!total) { alert('請輸入收入金額'); return; }
+  var rec = {id:uid(), date:date, type:'income', pays:pays, note:document.getElementById('in-note').value.trim()};
+  payCats.forEach(function(p) { var el = document.getElementById('pay-'+p.id); if(el) el.value = ''; });
+  document.getElementById('in-note').value = '';
+  records.push(rec);
+  renderTodayList(); updateSum();
+  apiPost({action:'addRecord', record:rec}, function(err, data){
+    if (err || !data.ok) { showToast('儲存失敗，請重試', false); records.pop(); renderTodayList(); updateSum(); return; }
+    showToast('✓ 收入已儲存');
+  });
+}
+
+function addExpense() {
+  var date = gd(); if (!date) { alert('請先選擇日期'); return; }
+  var amt = parseFloat(document.getElementById('exp-amount').value) || 0;
+  if (!amt) { alert('請輸入金額'); return; }
+  var rec = {id:uid(), date:date, type:'expense',
+    cat: document.getElementById('exp-cat').value,
+    amount: amt,
+    note: document.getElementById('exp-note').value.trim()};
+  document.getElementById('exp-amount').value = '';
+  document.getElementById('exp-note').value = '';
+  records.push(rec);
+  renderTodayList(); updateSum();
+  apiPost({action:'addRecord', record:rec}, function(err, data){
+    if (err || !data.ok) { showToast('儲存失敗，請重試', false); records.pop(); renderTodayList(); updateSum(); return; }
+    showToast('✓ 支出已儲存');
+  });
+}
+
+function addSettle() {
+  var date = gd();
+  if (!date) { alert('請先選擇日期'); return; }
+  var cat = document.getElementById('settle-cat').value;
+  var amt = parseFloat(document.getElementById('settle-amount').value) || 0;
+  if (!amt) { alert('請輸入入帳金額'); return; }
+  var note = document.getElementById('settle-note').value.trim();
+  var rec = {id:uid(), date:date, type:'settle', cat:cat, amount:amt, note:note};
+  document.getElementById('settle-amount').value = '';
+  document.getElementById('settle-note').value = '';
+  records.push(rec);
+  renderTodayList(); updateSum();
+  apiPost({action:'addRecord', record:rec}, function(err, data){
+    if (err || !data.ok) { showToast('儲存失敗，請重試', false); records.pop(); renderTodayList(); updateSum(); return; }
+    showToast('✓ 入帳已儲存');
+  });
+}
+
+function deleteRecord(id) {
+  if (!confirm('確定刪除？')) return;
+  var backup = records.slice();
+  records = records.filter(function(r) { return r.id !== id; });
+  renderTodayList(); updateSum();
+  apiPost({action:'deleteRecord', id:id}, function(err, data){
+    if (err || !data.ok) {
+      showToast('刪除失敗，請重試', false);
+      records = backup; renderTodayList(); updateSum();
+      return;
+    }
+    showToast('✓ 已刪除');
+  });
+}
+
+function renderTodayList() {
+  var date = gd();
+  var list = records.filter(function(r) { return r.date === date; });
+  var el = document.getElementById('today-list');
+  if (!list.length) { el.innerHTML = '<div class="empty">尚無記錄</div>'; return; }
+  el.innerHTML = list.map(function(r) {
+    var isImp = r.id && r.id.indexOf('imp_') === 0;
+    var impTag = isImp ? '<span class="tag tag-imp">匯入</span> ' : '';
+    if (r.type === 'income') {
+      var tags = payCats.filter(function(p){ return r.pays && r.pays[p.id]; }).map(function(p){
+        return '<span class="tag" style="background:' + p.color + '22;color:' + p.color + ';">' + p.name + ' ' + fmt(r.pays[p.id]) + '</span>';
+      }).join('');
+      return '<div class="lrow"><div>' + impTag + tags
+        + (r.note ? '<div style="font-size:12px;color:#888;margin-top:3px;">' + r.note + '</div>' : '')
+        + '</div><div style="font-weight:600;white-space:nowrap;">' + fmt(incTotal(r))
+        + '</div><button class="del" data-id="' + r.id + '" onclick="deleteRecord(this.dataset.id)">✕</button></div>';
+    } else if (r.type === 'settle') {
+      var SL = {linepay:'Line Pay', jkopay:'街口支付', easycard:'悠遊卡'};
+      var SC = {linepay:'#2196f3', jkopay:'#9c27b0', easycard:'#ff9800'};
+      var sc = SC[r.cat] || '#607d8b';
+      var sl = SL[r.cat] || r.cat;
+      return '<div class="lrow"><div>'
+        + '<span class="tag" style="background:#e3f2fd;color:#1565c0;font-size:10px;">入帳</span> '
+        + '<span class="tag" style="background:' + sc + '22;color:' + sc + ';">' + sl + '</span>'
+        + (r.note ? '<div style="font-size:12px;color:#888;margin-top:3px;">' + r.note + '</div>' : '')
+        + '</div><div style="font-weight:600;color:#1565c0;white-space:nowrap;">' + fmt(r.amount)
+        + '</div><button class="del" data-id="' + r.id + '" onclick="deleteRecord(this.dataset.id)">✕</button></div>';
+    } else {
+      var cat = expCats.find(function(e){ return e.id === r.cat; }) || {name:r.cat, color:'#888'};
+      return '<div class="lrow"><div>' + impTag
+        + '<span class="tag" style="background:' + cat.color + '22;color:' + cat.color + ';">' + cat.name + '</span>'
+        + (r.note ? '<div style="font-size:12px;color:#888;margin-top:3px;">' + r.note + '</div>' : '')
+        + '</div><div style="font-weight:600;color:#c62828;white-space:nowrap;">' + fmt(r.amount)
+        + '</div><button class="del" data-id="' + r.id + '" onclick="deleteRecord(this.dataset.id)">✕</button></div>';
+    }
+  }).join('');
+}
+
+function updateSum() {
+  var date = gd(); var inc = 0, exp = 0;
+  records.filter(function(r){ return r.date === date; }).forEach(function(r){
+    if (r.type === 'income') inc += incTotal(r); else exp += r.amount || 0;
+  });
+  document.getElementById('ti').textContent = fmt(inc);
+  document.getElementById('te').textContent = fmt(exp);
+  var p = inc - exp;
+  var pe = document.getElementById('tp');
+  pe.textContent = fmt(p);
+  pe.style.color = p >= 0 ? '#2e7d32' : '#c62828';
+}
+
+function renderHistory() {
+  var month = document.getElementById('history-month').value;
+  var el = document.getElementById('history-list');
+  if (!month) { el.innerHTML = '<div class="no-data">選擇月份查看記錄</div>'; return; }
+  var list = records.filter(function(r){ return r.date && r.date.startsWith(month); });
+  if (!list.length) { el.innerHTML = '<div class="no-data">該月份無記錄</div>'; return; }
+  var byDate = {};
+  list.forEach(function(r){ if (!byDate[r.date]) byDate[r.date] = []; byDate[r.date].push(r); });
+  el.innerHTML = Object.keys(byDate).sort().reverse().map(function(d){
+    var inc = 0, exp = 0;
+    byDate[d].forEach(function(r){ if(r.type==='income') inc+=incTotal(r); else exp+=r.amount||0; });
+    var profit = inc - exp;
+    return '<div class="block" style="margin-bottom:10px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+      + '<span style="font-weight:600;">' + d + '</span>'
+      + '<span style="font-size:13px;color:' + (profit>=0?'#2e7d32':'#c62828') + ';">結餘 ' + fmt(profit) + '</span></div>'
+      + '<div style="display:flex;gap:16px;font-size:13px;color:#888;">'
+      + '<span>收入 <b style="color:#2e7d32;">' + fmt(inc) + '</b></span>'
+      + '<span>支出 <b style="color:#c62828;">' + fmt(exp) + '</b></span></div></div>';
+  }).join('');
+}
+
+function renderSummary() {
+  var month = document.getElementById('summary-month').value;
+  var el = document.getElementById('summary-content');
+  if (!month) { el.innerHTML = '<div class="no-data">選擇月份</div>'; return; }
+  var list = records.filter(function(r){ return r.date && r.date.startsWith(month); });
+  if (!list.length) { el.innerHTML = '<div class="no-data">該月份無記錄</div>'; return; }
+  var tInc=0, tExp=0, pT={}, eT={};
+  payCats.forEach(function(p){ pT[p.id]=0; });
+  expCats.forEach(function(e){ eT[e.id]=0; });
+  list.forEach(function(r){
+    if (r.type==='income') {
+      payCats.forEach(function(p){ var v=(r.pays&&r.pays[p.id])||0; pT[p.id]+=v; tInc+=v; });
+    } else { eT[r.cat]=(eT[r.cat]||0)+(r.amount||0); tExp+=r.amount||0; }
+  });
+  var profit = tInc - tExp;
+  el.innerHTML =
+    '<div class="sgrid" style="margin-bottom:12px;">'
+    + '<div class="scard"><div class="lbl">總收入</div><div class="val" style="color:#2e7d32;">' + fmt(tInc) + '</div></div>'
+    + '<div class="scard"><div class="lbl">總支出</div><div class="val" style="color:#c62828;">' + fmt(tExp) + '</div></div>'
+    + '<div class="scard"><div class="lbl">月結餘</div><div class="val" style="color:' + (profit>=0?'#2e7d32':'#c62828') + ';">' + fmt(profit) + '</div></div></div>'
+    + '<div class="block" style="margin-bottom:12px;"><h3 style="margin-bottom:10px;">收入拆分</h3>'
+    + payCats.map(function(p){
+        return '<div class="drow"><span style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:' + p.color + ';display:inline-block;"></span>' + p.name + '</span><span>' + fmt(pT[p.id]||0) + '</span></div>';
+      }).join('')
+    + '<div class="drow" style="font-weight:600;margin-top:4px;"><span>合計</span><span style="color:#2e7d32;">' + fmt(tInc) + '</span></div></div>'
+    + '<div class="block"><h3 style="margin-bottom:10px;">支出拆分</h3>'
+    + expCats.map(function(e){
+        return '<div class="drow"><span style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:' + e.color + ';display:inline-block;"></span>' + e.name + '</span><span>' + fmt(eT[e.id]||0) + '</span></div>';
+      }).join('')
+    + '<div class="drow" style="font-weight:600;margin-top:4px;"><span>合計</span><span style="color:#c62828;">' + fmt(tExp) + '</span></div></div>';
+
+  // 入帳統計
+  var settleList = list.filter(function(r){ return r.type === 'settle'; });
+  if (settleList.length) {
+    var SL = {linepay:'Line Pay', jkopay:'街口支付', easycard:'悠遊卡'};
+    var SC = {linepay:'#2196f3', jkopay:'#9c27b0', easycard:'#ff9800'};
+    var sT = {linepay:0, jkopay:0, easycard:0};
+    settleList.forEach(function(r){ sT[r.cat] = (sT[r.cat]||0) + r.amount; });
+    var totalSettle = settleList.reduce(function(s,r){ return s+r.amount; }, 0);
+    el.innerHTML += '<div class="block" style="margin-top:12px;border-left:3px solid #1565c0;">'
+      + '<h3 style="margin-bottom:10px;">行動支付入帳</h3>'
+      + Object.keys(sT).filter(function(k){ return sT[k]>0; }).map(function(k){
+          return '<div class="drow"><span style="display:flex;align-items:center;gap:6px;">'
+            + '<span style="width:9px;height:9px;border-radius:50%;background:' + SC[k] + ';display:inline-block;"></span>'
+            + SL[k] + '</span><span>' + fmt(sT[k]) + '</span></div>';
+        }).join('')
+      + '<div class="drow" style="font-weight:600;margin-top:4px;"><span>合計入帳</span><span style="color:#1565c0;">' + fmt(totalSettle) + '</span></div>'
+      + '</div>';
+  }
+}
+
+function renderColorRow(cid, sel, type) {
+  var el = document.getElementById(cid);
+  el.innerHTML = COLORS.map(function(c){
+    return '<div class="cdot-sel' + (c===sel?' on':'') + '" style="background:' + c + ';" data-color="' + c + '" data-type="' + type + '"></div>';
+  }).join('');
+  el.querySelectorAll('.cdot-sel').forEach(function(dot){
+    dot.addEventListener('click', function(){
+      var c = this.getAttribute('data-color');
+      var t = this.getAttribute('data-type');
+      if (t === 'pay') setPayColor(c);
+      else setExpColor(c);
+    });
+  });
+}
+function setPayColor(c) { selPC = c; renderColorRow('pay-color-row', selPC, 'pay'); }
+function setExpColor(c) { selEC = c; renderColorRow('exp-color-row', selEC, 'exp'); }
+
+function renderSettings() {
+  var pEl = document.getElementById('pay-cat-list');
+  pEl.innerHTML = payCats.length ? payCats.map(function(cat,i){
+    return '<div class="cat-item"><div class="cdot" style="background:' + cat.color + ';"></div>'
+      + '<span class="cname">' + cat.name + '</span>'
+      + '<button class="cedit" data-type="pay" data-idx="' + i + '">改名</button>'
+      + '<button class="cdel" data-type="pay" data-idx="' + i + '">✕</button></div>';
+  }).join('') : '<div style="font-size:13px;color:#aaa;padding:8px 0;">尚無項目</div>';
+  var eEl = document.getElementById('exp-cat-list');
+  eEl.innerHTML = expCats.length ? expCats.map(function(cat,i){
+    return '<div class="cat-item"><div class="cdot" style="background:' + cat.color + ';"></div>'
+      + '<span class="cname">' + cat.name + '</span>'
+      + '<button class="cedit" data-type="exp" data-idx="' + i + '">改名</button>'
+      + '<button class="cdel" data-type="exp" data-idx="' + i + '">✕</button></div>';
+  }).join('') : '<div style="font-size:13px;color:#aaa;padding:8px 0;">尚無項目</div>';
+  pEl.querySelectorAll('.cedit').forEach(function(b){ b.addEventListener('click', function(){ editCat(this.dataset.type, parseInt(this.dataset.idx)); }); });
+  pEl.querySelectorAll('.cdel').forEach(function(b){ b.addEventListener('click', function(){ delCat(this.dataset.type, parseInt(this.dataset.idx)); }); });
+  eEl.querySelectorAll('.cedit').forEach(function(b){ b.addEventListener('click', function(){ editCat(this.dataset.type, parseInt(this.dataset.idx)); }); });
+  eEl.querySelectorAll('.cdel').forEach(function(b){ b.addEventListener('click', function(){ delCat(this.dataset.type, parseInt(this.dataset.idx)); }); });
+  renderColorRow('pay-color-row', selPC, 'pay');
+  renderColorRow('exp-color-row', selEC, 'exp');
+}
+
+function editCat(type, idx) {
+  var cats = (type==='pay') ? payCats : expCats;
+  var n = prompt('修改名稱：', cats[idx].name);
+  if (n && n.trim()) { cats[idx].name = n.trim(); type==='pay'?saveP():saveE(); renderSettings(); renderPayInputs(); renderExpSelect(); }
+}
+function delCat(type, idx) {
+  var cats = (type==='pay') ? payCats : expCats;
+  if (!confirm('確定刪除「' + cats[idx].name + '」？')) return;
+  cats.splice(idx, 1); type==='pay'?saveP():saveE(); renderSettings(); renderPayInputs(); renderExpSelect();
+}
+function addPayCat() {
+  var n = document.getElementById('new-pay-name').value.trim(); if (!n) { alert('請輸入名稱'); return; }
+  payCats.push({id:uid(), name:n, color:selPC}); saveP();
+  document.getElementById('new-pay-name').value = '';
+  renderSettings(); renderPayInputs();
+}
+function addExpCat() {
+  var n = document.getElementById('new-exp-name').value.trim(); if (!n) { alert('請輸入名稱'); return; }
+  expCats.push({id:uid(), name:n, color:selEC}); saveE();
+  document.getElementById('new-exp-name').value = '';
+  renderSettings(); renderExpSelect();
+}
+
+setToday();
+load(); // 從雲端載入類別和記錄
+var now = new Date();
+var ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+document.getElementById('history-month').value = ym;
+document.getElementById('summary-month').value = ym;
+document.getElementById('history-month').addEventListener('change', renderHistory);
+document.getElementById('summary-month').addEventListener('change', renderSummary);
+document.getElementById('entry-date').addEventListener('change', function(){ renderTodayList(); updateSum(); });
+</script>
+</body>
+</html>
