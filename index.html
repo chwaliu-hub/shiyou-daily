@@ -132,6 +132,26 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
     </div>
     <button class="add-btn" style="background:#1565c0;" onclick="addSettle()">＋ 新增入帳記錄</button>
   </div>
+  <div class="block">
+    <h3>存入銀行</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px;">記錄當日將現金或收款存入銀行帳戶的金額</p>
+    <div class="row2">
+      <div class="fld"><label>存款類型</label>
+        <select id="deposit-type">
+          <option value="cash">現金存入</option>
+          <option value="transfer_in">匯款收入（租金／客戶）</option>
+          <option value="transfer_out">匯款支出</option>
+        </select>
+      </div>
+      <div class="fld"><label>金額</label>
+        <input type="number" id="deposit-amount" placeholder="0" min="0">
+      </div>
+    </div>
+    <div class="fld" style="margin-bottom:0"><label>備註</label>
+      <input type="text" id="deposit-note" placeholder="例：存入現金、租客匯款...">
+    </div>
+    <button class="add-btn" style="background:#5c6bc0;" onclick="addDeposit()">＋ 新增銀行記錄</button>
+  </div>
   <div class="sec-lbl">今日明細</div>
   <div class="lblock"><div id="today-list"><div class="empty">尚無記錄</div></div></div>
 </div>
@@ -143,10 +163,18 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
 
 <div class="page" id="page-summary">
   <div class="date-bar" style="margin-bottom:8px;"><input type="month" id="summary-month" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-    <label style="font-size:13px;color:#666;white-space:nowrap;">期初現金</label>
-    <input type="number" id="opening-cash" placeholder="0" min="0" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;">
-    <button onclick="renderSummary()" style="padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">計算</button>
+  <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:12px;">
+    <div class="fld" style="margin-bottom:0;">
+      <label style="font-size:12px;color:#666;">期初現金</label>
+      <input type="number" id="opening-cash" placeholder="0" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;">
+    </div>
+    <div class="fld" style="margin-bottom:0;">
+      <label style="font-size:12px;color:#666;">期初銀行餘額</label>
+      <input type="number" id="opening-bank" placeholder="0" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;">
+    </div>
+    <div style="display:flex;align-items:flex-end;">
+      <button onclick="renderSummary()" style="padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">計算</button>
+    </div>
   </div>
   <div id="summary-content"><div class="no-data">選擇月份查看匯總</div></div>
 </div>
@@ -427,6 +455,24 @@ function addSettle() {
   });
 }
 
+function addDeposit() {
+  var date = gd();
+  if (!date) { alert('請先選擇日期'); return; }
+  var dtype = document.getElementById('deposit-type').value;
+  var amt = parseFloat(document.getElementById('deposit-amount').value) || 0;
+  if (!amt) { alert('請輸入金額'); return; }
+  var note = document.getElementById('deposit-note').value.trim();
+  var rec = {id:uid(), date:date, type:'deposit', cat:dtype, amount:amt, note:note};
+  document.getElementById('deposit-amount').value = '';
+  document.getElementById('deposit-note').value = '';
+  records.push(rec);
+  renderTodayList(); updateSum();
+  apiPost({action:'addRecord', record:rec}, function(err, data){
+    if (err || !data.ok) { showToast('儲存失敗，請重試', false); records.pop(); renderTodayList(); updateSum(); return; }
+    showToast('✓ 銀行記錄已儲存');
+  });
+}
+
 function deleteRecord(id) {
   if (!confirm('確定刪除？')) return;
   var backup = records.slice();
@@ -457,6 +503,19 @@ function renderTodayList() {
       return '<div class="lrow"><div>' + impTag + tags
         + (r.note ? '<div style="font-size:12px;color:#888;margin-top:3px;">' + r.note + '</div>' : '')
         + '</div><div style="font-weight:600;white-space:nowrap;">' + fmt(incTotal(r))
+        + '</div><button class="del" data-id="' + r.id + '" onclick="deleteRecord(this.dataset.id)">✕</button></div>';
+    } else if (r.type === 'deposit') {
+      var DL = {cash:'現金存入', transfer_in:'匯款收入', transfer_out:'匯款支出'};
+      var DC = {cash:'#388e3c', transfer_in:'#5c6bc0', transfer_out:'#e53935'};
+      var dc = DC[r.cat] || '#5c6bc0';
+      var dl = DL[r.cat] || r.cat;
+      var isOut = r.cat === 'transfer_out';
+      return '<div class="lrow"><div>'
+        + '<span class="tag" style="background:#ede7f6;color:#5c6bc0;font-size:10px;">銀行</span> '
+        + '<span class="tag" style="background:' + dc + '22;color:' + dc + ';">' + dl + '</span>'
+        + (r.note ? '<div style="font-size:12px;color:#888;margin-top:3px;">' + r.note + '</div>' : '')
+        + '</div><div style="font-weight:600;color:' + (isOut?'#c62828':'#5c6bc0') + ';white-space:nowrap;">'
+        + (isOut?'-':'') + fmt(r.amount)
         + '</div><button class="del" data-id="' + r.id + '" onclick="deleteRecord(this.dataset.id)">✕</button></div>';
     } else if (r.type === 'settle') {
       var SL = {linepay:'Line Pay', jkopay:'街口支付', easycard:'悠遊卡'};
@@ -625,15 +684,14 @@ function renderSummary() {
 
   // ── 現金流 ──
   var opening = parseFloat(document.getElementById('opening-cash').value) || 0;
+  var openingBank = parseFloat(document.getElementById('opening-bank').value) || 0;
 
-  // 按日期算每天現金流
   var byDate2 = {};
   list.forEach(function(r){ if (!byDate2[r.date]) byDate2[r.date]=[]; byDate2[r.date].push(r); });
   var dates = Object.keys(byDate2).sort();
 
-  // 行動支付未入帳（已收但未入銀行）
-  var mobileSales = 0; // 當月行動支付營業額
-  var mobileSettled = 0; // 當月實際入帳
+  // 行動支付未入帳
+  var mobileSales = 0, mobileSettled = 0;
   list.forEach(function(r){
     if (r.type === 'income') {
       payCats.filter(function(p){ return p.id !== 'cash'; }).forEach(function(p){
@@ -644,49 +702,60 @@ function renderSummary() {
   });
   var mobileUnsettle = mobileSales - mobileSettled;
 
-  // 每日現金流明細
-  var running = opening;
+  // 每日現金＋銀行流水
+  var runCash = opening;
+  var runBank = openingBank;
   var cfRows = dates.map(function(d){
-    var dayInc = 0, dayExp = 0, dayCash = 0, daySettle = 0;
+    var dayCash=0, daySettle=0, dayExp=0, dayDeposit=0, dayTransferIn=0, dayTransferOut=0;
     byDate2[d].forEach(function(r){
       if (r.type === 'income') {
-        dayInc += incTotal(r);
         dayCash += (r.pays && r.pays['cash']) || 0;
+        // 匯款收入直接進銀行
+        payCats.filter(function(p){ return p.id !== 'cash' && p.id !== 'linepay' && p.id !== 'jkopay' && p.id !== 'easycard'; }).forEach(function(p){
+          dayTransferIn += (r.pays && r.pays[p.id]) || 0;
+        });
       } else if (r.type === 'settle') {
         daySettle += r.amount || 0;
-      } else {
+      } else if (r.type === 'deposit') {
+        if (r.cat === 'cash') { dayDeposit += r.amount || 0; }
+        else if (r.cat === 'transfer_in') { dayTransferIn += r.amount || 0; }
+        else if (r.cat === 'transfer_out') { dayTransferOut += r.amount || 0; }
+      } else if (r.type === 'expense') {
         dayExp += r.amount || 0;
       }
     });
-    // 當日現金變動 = 現金收入 + 行動支付入帳 - 支出
-    var dayFlow = dayCash + daySettle - dayExp;
-    running += dayFlow;
+    // 現金：現金收入 - 現金支出 - 存入銀行
+    runCash += dayCash - dayExp - dayDeposit;
+    // 銀行：存入現金 + 行動支付入帳 + 匯款收入 - 匯款支出
+    runBank += dayDeposit + daySettle + dayTransferIn - dayTransferOut;
     return '<tr>'
       + '<td>' + d.slice(5) + '</td>'
       + '<td class="cf-in" style="text-align:right;">' + (dayCash>0?fmt(dayCash):'-') + '</td>'
-      + '<td class="cf-in" style="text-align:right;">' + (daySettle>0?fmt(daySettle):'-') + '</td>'
+      + '<td class="cf-in" style="text-align:right;">' + (daySettle+dayTransferIn>0?fmt(daySettle+dayTransferIn):'-') + '</td>'
       + '<td class="cf-out" style="text-align:right;">' + (dayExp>0?fmt(dayExp):'-') + '</td>'
-      + '<td class="cf-bal" style="text-align:right;color:' + (running>=0?'#2e7d32':'#c62828') + ';">' + fmt(running) + '</td>'
+      + '<td class="cf-bal" style="text-align:right;color:' + (runCash>=0?'#2e7d32':'#c62828') + ';">' + fmt(runCash) + '</td>'
+      + '<td class="cf-bal" style="text-align:right;color:' + (runBank>=0?'#1565c0':'#c62828') + ';">' + fmt(runBank) + '</td>'
       + '</tr>';
   }).join('');
 
-  var closing = opening + list.reduce(function(s,r){
-    if (r.type==='income') return s + ((r.pays&&r.pays['cash'])||0);
-    if (r.type==='settle') return s + (r.amount||0);
-    if (r.type==='expense') return s - (r.amount||0);
-    return s;
-  }, 0);
+  var closingCash = runCash;
+  var closingBank = runBank;
 
   el.innerHTML += '<div class="block" style="margin-top:12px;border-left:3px solid #388e3c;">'
     + '<h3 style="margin-bottom:12px;">現金流</h3>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">'
     + '<div class="scard"><div class="lbl">期初現金</div><div style="font-size:16px;font-weight:600;">' + fmt(opening) + '</div></div>'
-    + '<div class="scard"><div class="lbl">期末現金</div><div style="font-size:16px;font-weight:600;color:' + (closing>=0?'#2e7d32':'#c62828') + ';">' + fmt(closing) + '</div></div>'
+    + '<div class="scard"><div class="lbl">期末現金</div><div style="font-size:16px;font-weight:600;color:' + (closingCash>=0?'#2e7d32':'#c62828') + ';">' + fmt(closingCash) + '</div></div>'
     + '<div class="scard"><div class="lbl">待入帳</div><div style="font-size:16px;font-weight:600;color:#e65100;">' + fmt(mobileUnsettle) + '</div></div>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">'
+    + '<div class="scard"><div class="lbl">期初銀行</div><div style="font-size:16px;font-weight:600;">' + fmt(openingBank) + '</div></div>'
+    + '<div class="scard"><div class="lbl">期末銀行</div><div style="font-size:16px;font-weight:600;color:#1565c0;">' + fmt(closingBank) + '</div></div>'
+    + '<div class="scard"><div class="lbl">現金＋銀行</div><div style="font-size:16px;font-weight:600;color:#333;">' + fmt(closingCash+closingBank) + '</div></div>'
     + '</div>'
     + '<div style="overflow-x:auto;">'
     + '<table class="cf-table"><thead><tr>'
-    + '<th>日期</th><th style="text-align:right;">現金收</th><th style="text-align:right;">入帳收</th><th style="text-align:right;">支出</th><th style="text-align:right;">現金餘額</th>'
+    + '<th>日期</th><th style="text-align:right;">現金收</th><th style="text-align:right;">銀行收</th><th style="text-align:right;">支出</th><th style="text-align:right;">現金餘額</th><th style="text-align:right;">銀行餘額</th>'
     + '</tr></thead><tbody>' + cfRows + '</tbody></table>'
     + '</div></div>';
 }
