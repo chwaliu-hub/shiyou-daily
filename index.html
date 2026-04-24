@@ -54,6 +54,20 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
 .sec-lbl{font-size:12px;font-weight:600;color:#888;margin:4px 0 8px;}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
 .notice{padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;background:#e3f2fd;border:1px solid #90caf9;color:#0d47a1;}
+.day-block{background:#fff;border-radius:12px;border:1px solid #e8e6e0;margin-bottom:10px;overflow:hidden;}
+.day-header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;cursor:pointer;}
+.day-header:hover{background:#fafafa;}
+.day-header .dh-left{font-weight:600;font-size:14px;}
+.day-header .dh-right{display:flex;align-items:center;gap:10px;font-size:13px;}
+.day-detail{display:none;border-top:1px solid #f0ede8;}
+.day-detail.open{display:block;}
+.cf-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:4px;}
+.cf-table th{background:#f5f4f0;padding:8px 12px;text-align:left;font-weight:500;font-size:12px;color:#666;}
+.cf-table td{padding:8px 12px;border-top:1px solid #f0ede8;}
+.cf-table tr:first-child td{border-top:none;}
+.cf-in{color:#2e7d32;font-weight:500;}
+.cf-out{color:#c62828;font-weight:500;}
+.cf-bal{font-weight:600;}
 .loading-bar{display:none;position:fixed;top:0;left:0;right:0;height:3px;background:#1565c0;z-index:9999;animation:slide 1s infinite;}
 @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 .toast{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;white-space:nowrap;}
@@ -128,7 +142,12 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
 </div>
 
 <div class="page" id="page-summary">
-  <div class="date-bar" style="margin-bottom:12px;"><input type="month" id="summary-month" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>
+  <div class="date-bar" style="margin-bottom:8px;"><input type="month" id="summary-month" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+    <label style="font-size:13px;color:#666;white-space:nowrap;">期初現金</label>
+    <input type="number" id="opening-cash" placeholder="0" min="0" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;">
+    <button onclick="renderSummary()" style="padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">計算</button>
+  </div>
   <div id="summary-content"><div class="no-data">選擇月份查看匯總</div></div>
 </div>
 
@@ -470,17 +489,75 @@ function renderHistory() {
   var byDate = {};
   list.forEach(function(r){ if (!byDate[r.date]) byDate[r.date] = []; byDate[r.date].push(r); });
   el.innerHTML = Object.keys(byDate).sort().reverse().map(function(d){
-    var inc = 0, exp = 0;
-    byDate[d].forEach(function(r){ if(r.type==='income') inc+=incTotal(r); else exp+=r.amount||0; });
+    var inc = 0, exp = 0, settle = 0;
+    byDate[d].forEach(function(r){
+      if (r.type==='income') inc += incTotal(r);
+      else if (r.type==='settle') settle += r.amount||0;
+      else exp += r.amount||0;
+    });
     var profit = inc - exp;
-    return '<div class="block" style="margin-bottom:10px;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-      + '<span style="font-weight:600;">' + d + '</span>'
-      + '<span style="font-size:13px;color:' + (profit>=0?'#2e7d32':'#c62828') + ';">結餘 ' + fmt(profit) + '</span></div>'
-      + '<div style="display:flex;gap:16px;font-size:13px;color:#888;">'
-      + '<span>收入 <b style="color:#2e7d32;">' + fmt(inc) + '</b></span>'
-      + '<span>支出 <b style="color:#c62828;">' + fmt(exp) + '</b></span></div></div>';
+    var SL = {linepay:'Line Pay', jkopay:'街口支付', easycard:'悠遊卡'};
+    var SC = {linepay:'#2196f3', jkopay:'#9c27b0', easycard:'#ff9800'};
+    var detailRows = byDate[d].map(function(r) {
+      var isImp = r.id && r.id.indexOf('imp_') === 0;
+      var impTag = isImp ? '<span style="font-size:10px;background:#e8eaf6;color:#3949ab;padding:1px 5px;border-radius:10px;margin-right:4px;">匯入</span>' : '';
+      if (r.type === 'income') {
+        var tags = payCats.filter(function(p){ return r.pays && r.pays[p.id]; }).map(function(p){
+          return '<span style="font-size:11px;background:' + p.color + '22;color:' + p.color + ';padding:2px 6px;border-radius:10px;margin-right:2px;">' + p.name + ' ' + fmt(r.pays[p.id]) + '</span>';
+        }).join('');
+        return '<tr><td>' + impTag + tags + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
+          + '<td class="cf-in" style="text-align:right;">' + fmt(incTotal(r)) + '</td>'
+          + '<td style="text-align:right;"><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
+      } else if (r.type === 'settle') {
+        var sc = SC[r.cat]||'#607d8b'; var sl = SL[r.cat]||r.cat;
+        return '<tr><td><span style="font-size:11px;background:#e3f2fd;color:#1565c0;padding:2px 6px;border-radius:10px;margin-right:4px;">入帳</span>'
+          + '<span style="font-size:11px;background:' + sc + '22;color:' + sc + ';padding:2px 6px;border-radius:10px;">' + sl + '</span>'
+          + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
+          + '<td class="cf-in" style="text-align:right;">' + fmt(r.amount) + '</td>'
+          + '<td style="text-align:right;"><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
+      } else {
+        var cat = expCats.find(function(e){ return e.id === r.cat; }) || {name:r.cat, color:'#888'};
+        return '<tr><td>' + impTag + '<span style="font-size:11px;background:' + cat.color + '22;color:' + cat.color + ';padding:2px 6px;border-radius:10px;">' + cat.name + '</span>'
+          + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
+          + '<td class="cf-out" style="text-align:right;">-' + fmt(r.amount) + '</td>'
+          + '<td style="text-align:right;"><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
+      }
+    }).join('');
+    return '<div class="day-block" id="day-' + d + '">'
+      + '<div class="day-header" data-date="' + d + '" onclick="toggleDay(this.dataset.date)">'
+      + '<span class="dh-left">' + d + '</span>'
+      + '<span class="dh-right">'
+      + '<span style="color:#2e7d32;">收 ' + fmt(inc) + '</span>'
+      + '<span style="color:#c62828;">支 ' + fmt(exp) + '</span>'
+      + '<span style="color:' + (profit>=0?'#2e7d32':'#c62828') + ';font-weight:600;">結 ' + fmt(profit) + '</span>'
+      + '<span style="color:#aaa;font-size:12px;">▼</span>'
+      + '</span></div>'
+      + '<div class="day-detail" id="detail-' + d + '">'
+      + '<table class="cf-table"><thead><tr><th>項目</th><th style="text-align:right;">金額</th><th></th></tr></thead><tbody>'
+      + detailRows
+      + '</tbody></table></div></div>';
   }).join('');
+}
+
+function toggleDay(d) {
+  var el = document.getElementById('detail-' + d);
+  if (el) el.classList.toggle('open');
+}
+
+function deleteFromHistory(id) {
+  if (!confirm('確定刪除？')) return;
+  var backup = records.slice();
+  records = records.filter(function(r){ return r.id !== id; });
+  renderHistory();
+  renderTodayList();
+  updateSum();
+  apiPost({action:'deleteRecord', id:id}, function(err, data){
+    if (err || !data.ok) {
+      showToast('刪除失敗，請重試', false);
+      records = backup; renderHistory(); return;
+    }
+    showToast('✓ 已刪除');
+  });
 }
 
 function renderSummary() {
@@ -515,10 +592,10 @@ function renderSummary() {
     + '<div class="drow" style="font-weight:600;margin-top:4px;"><span>合計</span><span style="color:#c62828;">' + fmt(tExp) + '</span></div></div>';
 
   // 入帳統計
+  var SL = {linepay:'Line Pay', jkopay:'街口支付', easycard:'悠遊卡'};
+  var SC = {linepay:'#2196f3', jkopay:'#9c27b0', easycard:'#ff9800'};
   var settleList = list.filter(function(r){ return r.type === 'settle'; });
   if (settleList.length) {
-    var SL = {linepay:'Line Pay', jkopay:'街口支付', easycard:'悠遊卡'};
-    var SC = {linepay:'#2196f3', jkopay:'#9c27b0', easycard:'#ff9800'};
     var sT = {linepay:0, jkopay:0, easycard:0};
     settleList.forEach(function(r){ sT[r.cat] = (sT[r.cat]||0) + r.amount; });
     var totalSettle = settleList.reduce(function(s,r){ return s+r.amount; }, 0);
@@ -532,6 +609,73 @@ function renderSummary() {
       + '<div class="drow" style="font-weight:600;margin-top:4px;"><span>合計入帳</span><span style="color:#1565c0;">' + fmt(totalSettle) + '</span></div>'
       + '</div>';
   }
+
+  // ── 現金流 ──
+  var opening = parseFloat(document.getElementById('opening-cash').value) || 0;
+
+  // 按日期算每天現金流
+  var byDate2 = {};
+  list.forEach(function(r){ if (!byDate2[r.date]) byDate2[r.date]=[]; byDate2[r.date].push(r); });
+  var dates = Object.keys(byDate2).sort();
+
+  // 行動支付未入帳（已收但未入銀行）
+  var mobileSales = 0; // 當月行動支付營業額
+  var mobileSettled = 0; // 當月實際入帳
+  list.forEach(function(r){
+    if (r.type === 'income') {
+      payCats.filter(function(p){ return p.id !== 'cash'; }).forEach(function(p){
+        mobileSales += (r.pays && r.pays[p.id]) || 0;
+      });
+    }
+    if (r.type === 'settle') mobileSettled += r.amount || 0;
+  });
+  var mobileUnsettle = mobileSales - mobileSettled;
+
+  // 每日現金流明細
+  var running = opening;
+  var cfRows = dates.map(function(d){
+    var dayInc = 0, dayExp = 0, dayCash = 0, daySettle = 0;
+    byDate2[d].forEach(function(r){
+      if (r.type === 'income') {
+        dayInc += incTotal(r);
+        dayCash += (r.pays && r.pays['cash']) || 0;
+      } else if (r.type === 'settle') {
+        daySettle += r.amount || 0;
+      } else {
+        dayExp += r.amount || 0;
+      }
+    });
+    // 當日現金變動 = 現金收入 + 行動支付入帳 - 支出
+    var dayFlow = dayCash + daySettle - dayExp;
+    running += dayFlow;
+    return '<tr>'
+      + '<td>' + d.slice(5) + '</td>'
+      + '<td class="cf-in" style="text-align:right;">' + (dayCash>0?fmt(dayCash):'-') + '</td>'
+      + '<td class="cf-in" style="text-align:right;">' + (daySettle>0?fmt(daySettle):'-') + '</td>'
+      + '<td class="cf-out" style="text-align:right;">' + (dayExp>0?fmt(dayExp):'-') + '</td>'
+      + '<td class="cf-bal" style="text-align:right;color:' + (running>=0?'#2e7d32':'#c62828') + ';">' + fmt(running) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var closing = opening + list.reduce(function(s,r){
+    if (r.type==='income') return s + ((r.pays&&r.pays['cash'])||0);
+    if (r.type==='settle') return s + (r.amount||0);
+    if (r.type==='expense') return s - (r.amount||0);
+    return s;
+  }, 0);
+
+  el.innerHTML += '<div class="block" style="margin-top:12px;border-left:3px solid #388e3c;">'
+    + '<h3 style="margin-bottom:12px;">現金流</h3>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">'
+    + '<div class="scard"><div class="lbl">期初現金</div><div style="font-size:16px;font-weight:600;">' + fmt(opening) + '</div></div>'
+    + '<div class="scard"><div class="lbl">期末現金</div><div style="font-size:16px;font-weight:600;color:' + (closing>=0?'#2e7d32':'#c62828') + ';">' + fmt(closing) + '</div></div>'
+    + '<div class="scard"><div class="lbl">待入帳</div><div style="font-size:16px;font-weight:600;color:#e65100;">' + fmt(mobileUnsettle) + '</div></div>'
+    + '</div>'
+    + '<div style="overflow-x:auto;">'
+    + '<table class="cf-table"><thead><tr>'
+    + '<th>日期</th><th style="text-align:right;">現金收</th><th style="text-align:right;">入帳收</th><th style="text-align:right;">支出</th><th style="text-align:right;">現金餘額</th>'
+    + '</tr></thead><tbody>' + cfRows + '</tbody></table>'
+    + '</div></div>';
 }
 
 function renderColorRow(cid, sel, type) {
