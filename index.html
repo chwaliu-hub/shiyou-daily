@@ -202,7 +202,8 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
       <label style="font-size:12px;color:#666;">期初銀行餘額</label>
       <input type="number" id="opening-bank" placeholder="0" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;" oninput="updateOpeningTotal()">
     </div>
-    <div style="display:flex;align-items:flex-end;">
+    <div style="display:flex;align-items:flex-end;gap:6px;">
+      <button onclick="saveSettings()" style="padding:9px 14px;border:1px solid #5c6bc0;border-radius:8px;background:#fff;color:#5c6bc0;font-size:13px;cursor:pointer;white-space:nowrap;">儲存</button>
       <button onclick="renderSummary()" style="padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">計算</button>
     </div>
   </div>
@@ -375,7 +376,6 @@ function load() {
   setSyncStatus('⏳ 同步中...');
   apiGet({action:'getCats'}, function(err, data) {
     if (err || !data.ok) {
-      // 雲端失敗，用預設值
       payCats = DEF_PAY.map(function(x){ return {id:x.id,name:x.name,color:x.color}; });
       expCats = DEF_EXP.map(function(x){ return {id:x.id,name:x.name,color:x.color}; });
       setSyncStatus('⚠️ 類別載入失敗，使用預設值');
@@ -385,6 +385,24 @@ function load() {
     }
     renderPayInputs();
     renderExpSelect();
+    loadSettings();
+  });
+}
+
+function loadSettings() {
+  apiGet({action:'getSettings'}, function(err, data) {
+    if (!err && data.ok && data.settings) {
+      var s = data.settings;
+      if (s.openingCash) {
+        var el = document.getElementById('opening-cash');
+        if (el) el.value = s.openingCash;
+      }
+      if (s.openingBank) {
+        var el2 = document.getElementById('opening-bank');
+        if (el2) el2.value = s.openingBank;
+      }
+      updateOpeningTotal();
+    }
     loadRecords();
   });
 }
@@ -406,6 +424,15 @@ function loadRecords() {
 }
 
 function saveR() { /* 雲端版不用本地存 */ }
+
+function saveSettings() {
+  var cash = document.getElementById('opening-cash').value || '0';
+  var bank = document.getElementById('opening-bank').value || '0';
+  apiPost({action:'saveSettings', settings:{openingCash:cash, openingBank:bank}}, function(err, data){
+    if (err || !data.ok) { showToast('設定儲存失敗', false); return; }
+    showToast('✓ 期初設定已儲存');
+  });
+}
 function saveP() {
   apiPost({action:'saveCats', payCats:payCats, expCats:expCats}, function(err, data){
     if (err || !data.ok) { showToast('類別儲存失敗', false); return; }
@@ -1109,7 +1136,7 @@ function runSearch() {
       var tags = payCats.filter(function(p){ return r.pays&&r.pays[p.id]; }).map(function(p){
         return '<span style="font-size:11px;background:'+p.color+'22;color:'+p.color+';padding:2px 6px;border-radius:10px;margin-right:2px;">'+p.name+' '+fmt(r.pays[p.id])+'</span>';
       }).join('');
-      return '<tr><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
+      return '<tr style="cursor:pointer;" onclick="openEditModal(\''+r.id+'\')" title="點擊編輯"><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
         + '<td style="padding:8px 10px;">'+impTag+tags+(r.note?'<div style="font-size:11px;color:#aaa;">'+r.note+'</div>':'')+'</td>'
         + '<td style="padding:8px 10px;text-align:right;color:#2e7d32;font-weight:500;">'+fmt(total)+'</td></tr>';
     } else if (r.type === 'expense') {
@@ -1117,14 +1144,14 @@ function runSearch() {
       var cat2 = expCats.find(function(e){ return e.id===r.cat; })||{name:r.cat,color:'#888'};
       var ncTag = r.noncash ? '<span style="font-size:10px;background:#f3e5f5;color:#7b1fa2;padding:1px 5px;border-radius:10px;margin-right:4px;">非現金</span>' : '';
       var accTag = (r.accrual && r.accrual !== r.date.slice(0,7)) ? '<span style="font-size:10px;background:#fff3e0;color:#e65100;padding:1px 5px;border-radius:10px;margin-left:4px;">歸'+r.accrual+'</span>' : '';
-      return '<tr><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
+      return '<tr style="cursor:pointer;" onclick="openEditModal(\''+r.id+'\')" title="點擊編輯"><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
         + '<td style="padding:8px 10px;">'+impTag+ncTag+'<span style="font-size:11px;background:'+cat2.color+'22;color:'+cat2.color+';padding:2px 6px;border-radius:10px;">'+cat2.name+'</span>'+accTag+(r.note?'<div style="font-size:11px;color:#aaa;">'+r.note+'</div>':'')+'</td>'
         + '<td style="padding:8px 10px;text-align:right;color:#c62828;font-weight:500;">-'+fmt(r.amount||0)+'</td></tr>';
     } else if (r.type === 'settle') {
       totalOther += r.amount||0;
       var SL2={linepay:'Line Pay',jkopay:'街口支付',easycard:'悠遊卡'};
       var SC2={linepay:'#2196f3',jkopay:'#9c27b0',easycard:'#ff9800'};
-      return '<tr><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
+      return '<tr style="cursor:pointer;" onclick="openEditModal(\''+r.id+'\')" title="點擊編輯"><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
         + '<td style="padding:8px 10px;"><span style="font-size:11px;background:#e3f2fd;color:#1565c0;padding:2px 6px;border-radius:10px;margin-right:4px;">入帳</span>'
         + '<span style="font-size:11px;background:'+(SC2[r.cat]||'#888')+'22;color:'+(SC2[r.cat]||'#888')+';padding:2px 6px;border-radius:10px;">'+(SL2[r.cat]||r.cat)+'</span>'
         + (r.note?'<div style="font-size:11px;color:#aaa;">'+r.note+'</div>':'')+'</td>'
@@ -1133,7 +1160,7 @@ function runSearch() {
       var DL2={cash:'現金存入',transfer_in:'匯款收入',transfer_out:'匯款支出'};
       var isOut = r.cat==='transfer_out';
       if (isOut) totalExp += r.amount||0; else totalOther += r.amount||0;
-      return '<tr><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
+      return '<tr style="cursor:pointer;" onclick="openEditModal(\''+r.id+'\')" title="點擊編輯"><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
         + '<td style="padding:8px 10px;"><span style="font-size:11px;background:#ede7f6;color:#5c6bc0;padding:2px 6px;border-radius:10px;">'+(DL2[r.cat]||r.cat)+'</span>'
         + (r.note?'<div style="font-size:11px;color:#aaa;">'+r.note+'</div>':'')+'</td>'
         + '<td style="padding:8px 10px;text-align:right;color:'+(isOut?'#c62828':'#5c6bc0')+';font-weight:500;">'+(isOut?'-':'')+fmt(r.amount||0)+'</td></tr>';
