@@ -135,6 +135,10 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
       <div class="fld"><label>費用歸屬月</label><input type="month" id="exp-accrual" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;"></div>
       <div class="fld"><label>說明</label><input type="text" id="exp-note" placeholder="選填"></div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;margin-bottom:2px;">
+      <input type="checkbox" id="exp-noncash" style="width:16px;height:16px;cursor:pointer;">
+      <label for="exp-noncash" style="font-size:13px;color:#666;cursor:pointer;">非現金支出（如攤提，不計入現金流）</label>
+    </div>
     <button class="add-btn" onclick="addExpense()">＋ 新增支出</button>
   </div>
   <div class="block">
@@ -460,13 +464,16 @@ function addExpense() {
   var amt = parseFloat(document.getElementById('exp-amount').value) || 0;
   if (!amt) { alert('請輸入金額'); return; }
   var accrual = document.getElementById('exp-accrual').value || date.slice(0,7);
+  var noncash = document.getElementById('exp-noncash').checked ? 1 : 0;
   var rec = {id:uid(), date:date, type:'expense',
     cat: document.getElementById('exp-cat').value,
     amount: amt,
     note: document.getElementById('exp-note').value.trim(),
-    accrual: accrual};
+    accrual: accrual,
+    noncash: noncash};
   document.getElementById('exp-amount').value = '';
   document.getElementById('exp-note').value = '';
+  document.getElementById('exp-noncash').checked = false;
   records.push(rec);
   renderTodayList(); updateSum();
   apiPost({action:'addRecord', record:rec}, function(err, data){
@@ -581,8 +588,8 @@ function updateSum() {
   var date = gd(); var inc = 0, exp = 0;
   records.filter(function(r){ return r.date === date; }).forEach(function(r){
     if (r.type === 'income') inc += incTotal(r);
-    else if (r.type === 'expense') exp += r.amount || 0;
-    // settle 和 deposit 不算在今日收支
+    else if (r.type === 'expense' && !r.noncash) exp += r.amount || 0;
+    // settle、deposit、noncash 不算在今日收支
   });
   document.getElementById('ti').textContent = fmt(inc);
   document.getElementById('te').textContent = fmt(exp);
@@ -629,7 +636,8 @@ function renderHistory() {
           + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
       } else {
         var cat = expCats.find(function(e){ return e.id === r.cat; }) || {name:r.cat, color:'#888'};
-        return '<tr><td>' + impTag + '<span style="font-size:11px;background:' + cat.color + '22;color:' + cat.color + ';padding:2px 6px;border-radius:10px;">' + cat.name + '</span>'
+        var ncTag = r.noncash ? '<span style="font-size:10px;background:#f3e5f5;color:#7b1fa2;padding:1px 5px;border-radius:10px;margin-right:4px;">非現金</span>' : '';
+        return '<tr><td>' + impTag + ncTag + '<span style="font-size:11px;background:' + cat.color + '22;color:' + cat.color + ';padding:2px 6px;border-radius:10px;">' + cat.name + '</span>'
           + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
           + '<td class="cf-out" style="text-align:right;">-' + fmt(r.amount) + '</td>'
           + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
@@ -689,6 +697,9 @@ function openEditModal(id) {
     body += '</div>';
     body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">費用歸屬月</label>'
       + '<input type="month" id="edit-accrual" value="' + (r.accrual||r.date.slice(0,7)) + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+    body += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'
+      + '<input type="checkbox" id="edit-noncash"' + (r.noncash?' checked':'') + ' style="width:16px;height:16px;">'
+      + '<label for="edit-noncash" style="font-size:13px;color:#666;">非現金支出（不計入現金流）</label></div>';
   } else {
     // settle / deposit：金額
     body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">金額</label>'
@@ -729,9 +740,11 @@ function saveEdit() {
     var catEl = document.getElementById('edit-cat');
     var amtEl = document.getElementById('edit-amount');
     var accEl = document.getElementById('edit-accrual');
+    var ncEl = document.getElementById('edit-noncash');
     if (catEl) r.cat = catEl.value;
     if (amtEl) r.amount = parseFloat(amtEl.value)||0;
     if (accEl) r.accrual = accEl.value;
+    if (ncEl) r.noncash = ncEl.checked ? 1 : 0;
   } else {
     var amtEl2 = document.getElementById('edit-amount');
     if (amtEl2) r.amount = parseFloat(amtEl2.value)||0;
@@ -784,8 +797,8 @@ function renderSummary() {
   list.forEach(function(r){
     if (r.type==='income') {
       payCats.forEach(function(p){ var v=(r.pays&&r.pays[p.id])||0; pT[p.id]+=v; tInc+=v; });
-    } else if (r.type==='expense') { eT[r.cat]=(eT[r.cat]||0)+(r.amount||0); tExp+=r.amount||0; }
-    // settle/deposit 不算在收支統計
+    } else if (r.type==='expense' && !r.noncash) { eT[r.cat]=(eT[r.cat]||0)+(r.amount||0); tExp+=r.amount||0; }
+    // settle/deposit/noncash 不算在收支統計
   });
   var profit = tInc - tExp;
   el.innerHTML =
@@ -855,7 +868,7 @@ function renderSummary() {
       } else if (r.type === 'deposit') {
         if (r.cat === 'transfer_in') dayIn += r.amount || 0;
         else if (r.cat === 'transfer_out') dayTransferOut += r.amount || 0;
-      } else if (r.type === 'expense') {
+      } else if (r.type === 'expense' && !r.noncash) {
         dayExp += r.amount || 0;
       }
     });
@@ -1044,7 +1057,18 @@ function renderPL() {
   var thLStyle = 'style="padding:8px 10px;text-align:left;font-weight:500;font-size:12px;color:#666;"';
   var separatorRow = '<tr style="background:#f5f4f0;"><td colspan="' + (months.length+2) + '" style="padding:4px;"></td></tr>';
 
-  var html = '<div style="overflow-x:auto;">'
+  // 折線圖用 Canvas
+  var chartMonthLabels = months.map(function(m){ return parseInt(m)+'月'; });
+  var chartOpInc = fullYear.map(function(m){ return mVal(m,'opInc'); });
+  var chartGross = fullYear.map(function(m){ return mGross(m); });
+  var chartOpProfit = fullYear.map(function(m){ return mOpProfit(m); });
+
+  var chartHtml = '<div class="block" style="margin-bottom:12px;">'
+    + '<h3 style="margin-bottom:16px;">走勢圖</h3>'
+    + '<canvas id="pl-chart" style="width:100%;height:260px;"></canvas>'
+    + '</div>';
+
+  var html = chartHtml + '<div style="overflow-x:auto;">'
     + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
     + '<thead><tr style="border-bottom:2px solid #e8e6e0;">'
     + '<th ' + thLStyle + '>項目</th>'
@@ -1099,6 +1123,90 @@ function renderPL() {
 
   html += '</tbody></table></div>';
   el.innerHTML = html;
+
+  // 渲染折線圖
+  var canvas = document.getElementById('pl-chart');
+  if (canvas) {
+    var ctx = canvas.getContext('2d');
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = 260 * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = '260px';
+    ctx.scale(dpr, dpr);
+
+    var W = rect.width, H = 260;
+    var padL = 72, padR = 16, padT = 20, padB = 36;
+    var chartW = W - padL - padR;
+    var chartH = H - padT - padB;
+    var n = chartMonthLabels.length;
+
+    // 找最大最小值
+    var allVals = chartOpInc.concat(chartGross).concat(chartOpProfit);
+    var maxV = Math.max.apply(null, allVals.concat([0]));
+    var minV = Math.min.apply(null, allVals.concat([0]));
+    var range = maxV - minV || 1;
+
+    function xPos(i) { return padL + i * chartW / (n-1); }
+    function yPos(v) { return padT + chartH - (v - minV) / range * chartH; }
+
+    // 背景格線
+    ctx.strokeStyle = '#f0ede8';
+    ctx.lineWidth = 1;
+    for (var gi = 0; gi <= 4; gi++) {
+      var gy = padT + gi * chartH / 4;
+      ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(W-padR, gy); ctx.stroke();
+      var gv = maxV - gi * (maxV-minV) / 4;
+      ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(gv>=1000?Math.round(gv/1000)+'k':Math.round(gv), padL-6, gy+4);
+    }
+
+    // 零線
+    if (minV < 0 && maxV > 0) {
+      ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(padL, yPos(0)); ctx.lineTo(W-padR, yPos(0)); ctx.stroke();
+    }
+
+    // 折線
+    var series = [
+      {data: chartOpInc,    color: '#2e7d32', label: '營業收入'},
+      {data: chartGross,    color: '#1565c0', label: '毛利'},
+      {data: chartOpProfit, color: '#e65100', label: '營業淨利'}
+    ];
+
+    series.forEach(function(s) {
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      s.data.forEach(function(v, i) {
+        if (i === 0) ctx.moveTo(xPos(i), yPos(v));
+        else ctx.lineTo(xPos(i), yPos(v));
+      });
+      ctx.stroke();
+      // 點
+      s.data.forEach(function(v, i) {
+        ctx.fillStyle = s.color;
+        ctx.beginPath(); ctx.arc(xPos(i), yPos(v), 3, 0, Math.PI*2); ctx.fill();
+      });
+    });
+
+    // X 軸標籤
+    ctx.fillStyle = '#888'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+    chartMonthLabels.forEach(function(lb, i) {
+      ctx.fillText(lb, xPos(i), H - 8);
+    });
+
+    // 圖例
+    var lx = padL;
+    series.forEach(function(s) {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(lx, 4, 16, 3);
+      ctx.fillStyle = '#555'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(s.label, lx+20, 12);
+      lx += ctx.measureText(s.label).width + 36;
+    });
+  }
 }
 
 setToday();
