@@ -98,6 +98,7 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
   <button class="tab" id="tab-summary" onclick="sw('summary')">月匯總</button>
   <button class="tab" id="tab-settings" onclick="sw('settings')">類別設定</button>
   <button class="tab" id="tab-pl" onclick="sw('pl')">損益表</button>
+  <button class="tab" id="tab-search" onclick="sw('search')">查詢</button>
 </div>
 
 <div class="page active" id="page-entry">
@@ -215,6 +216,54 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
     <button onclick="renderPL()" style="padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">計算</button>
   </div>
   <div id="pl-content"><div class="no-data">選擇年份查看損益表</div></div>
+</div>
+
+<div class="page" id="page-search">
+  <div class="block" style="margin-bottom:12px;">
+    <h3 style="margin-bottom:14px;">查詢條件</h3>
+
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button id="sq-tab-month" onclick="switchSearchTab('month')" style="flex:1;padding:8px;border:1px solid #222;border-radius:8px;background:#222;color:#fff;font-size:13px;cursor:pointer;font-weight:500;">月份查詢</button>
+      <button id="sq-tab-range" onclick="switchSearchTab('range')" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#888;font-size:13px;cursor:pointer;">日期範圍查詢</button>
+    </div>
+
+    <div id="sq-month-panel">
+      <div class="fld" style="margin-bottom:10px;">
+        <label>月份</label>
+        <input type="month" id="sq-month" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;">
+      </div>
+    </div>
+
+    <div id="sq-range-panel" style="display:none;">
+      <div class="row2" style="margin-bottom:10px;">
+        <div class="fld"><label>開始日期</label><input type="date" id="sq-start" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;width:100%;"></div>
+        <div class="fld"><label>結束日期</label><input type="date" id="sq-end" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;width:100%;"></div>
+      </div>
+    </div>
+
+    <div class="row2" style="margin-bottom:10px;">
+      <div class="fld">
+        <label>類型</label>
+        <select id="sq-type" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">
+          <option value="all">全部</option>
+          <option value="income">收入</option>
+          <option value="expense">支出</option>
+          <option value="settle">行動支付入帳</option>
+          <option value="deposit">銀行存款</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label>類別</label>
+        <select id="sq-cat" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">
+          <option value="all">全部類別</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="add-btn" onclick="runSearch()">🔍 查詢</button>
+  </div>
+
+  <div id="search-result"></div>
 </div>
 
 <div class="page" id="page-settings">
@@ -400,7 +449,7 @@ function importHistorical() {
 }
 
 function sw(tab) {
-  ['entry','history','summary','settings','pl'].forEach(function(id) {
+  ['entry','history','summary','settings','pl','search'].forEach(function(id) {
     document.getElementById('tab-'+id).classList.toggle('active', id===tab);
     document.getElementById('page-'+id).classList.toggle('active', id===tab);
   });
@@ -408,6 +457,7 @@ function sw(tab) {
   if (tab === 'summary') renderSummary();
   if (tab === 'settings') renderSettings();
   if (tab === 'pl') renderPL();
+  if (tab === 'search') initSearch();
 }
 
 function setToday() {
@@ -965,6 +1015,147 @@ function addExpCat() {
   expCats.push({id:uid(), name:n, color:selEC}); saveE();
   document.getElementById('new-exp-name').value = '';
   renderSettings(); renderExpSelect();
+}
+
+// ── 查詢 ──
+var searchTabMode = 'month';
+
+function switchSearchTab(mode) {
+  searchTabMode = mode;
+  document.getElementById('sq-month-panel').style.display = mode==='month' ? 'block' : 'none';
+  document.getElementById('sq-range-panel').style.display = mode==='range' ? 'block' : 'none';
+  var btnM = document.getElementById('sq-tab-month');
+  var btnR = document.getElementById('sq-tab-range');
+  btnM.style.background = mode==='month' ? '#222' : '#fff';
+  btnM.style.color = mode==='month' ? '#fff' : '#888';
+  btnM.style.borderColor = mode==='month' ? '#222' : '#ddd';
+  btnR.style.background = mode==='range' ? '#222' : '#fff';
+  btnR.style.color = mode==='range' ? '#fff' : '#888';
+  btnR.style.borderColor = mode==='range' ? '#222' : '#ddd';
+}
+
+function initSearch() {
+  // 更新類別下拉
+  var catSel = document.getElementById('sq-cat');
+  var type = document.getElementById('sq-type').value;
+  catSel.innerHTML = '<option value="all">全部類別</option>';
+  if (type === 'expense' || type === 'all') {
+    expCats.forEach(function(e) {
+      catSel.innerHTML += '<option value="exp-' + e.id + '">' + e.name + '</option>';
+    });
+  }
+  if (type === 'income' || type === 'all') {
+    payCats.forEach(function(p) {
+      catSel.innerHTML += '<option value="pay-' + p.id + '">' + p.name + '</option>';
+    });
+  }
+}
+
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'sq-type') initSearch();
+});
+
+function runSearch() {
+  var type = document.getElementById('sq-type').value;
+  var cat = document.getElementById('sq-cat').value;
+  var el = document.getElementById('search-result');
+
+  // 篩選日期範圍
+  var filtered = records.filter(function(r) {
+    if (!r.date) return false;
+    if (searchTabMode === 'month') {
+      var month = document.getElementById('sq-month').value;
+      if (!month) { el.innerHTML = '<div class="no-data">請選擇月份</div>'; return false; }
+      return r.date.startsWith(month);
+    } else {
+      var start = document.getElementById('sq-start').value;
+      var end = document.getElementById('sq-end').value;
+      if (!start || !end) { el.innerHTML = '<div class="no-data">請選擇日期範圍</div>'; return false; }
+      return r.date >= start && r.date <= end;
+    }
+  });
+
+  if (!filtered.length) { el.innerHTML = '<div class="no-data">查無資料</div>'; return; }
+
+  // 篩選類型
+  if (type !== 'all') filtered = filtered.filter(function(r){ return r.type === type; });
+
+  // 篩選類別
+  if (cat !== 'all') {
+    if (cat.startsWith('exp-')) {
+      var catId = cat.slice(4);
+      filtered = filtered.filter(function(r){ return r.type==='expense' && r.cat===catId; });
+    } else if (cat.startsWith('pay-')) {
+      var payId = cat.slice(4);
+      filtered = filtered.filter(function(r){ return r.type==='income' && r.pays && r.pays[payId]; });
+    }
+  }
+
+  if (!filtered.length) { el.innerHTML = '<div class="no-data">查無符合條件的資料</div>'; return; }
+
+  // 排序：日期
+  filtered.sort(function(a,b){ return a.date > b.date ? 1 : -1; });
+
+  // 計算合計
+  var totalInc = 0, totalExp = 0, totalOther = 0;
+
+  var rows = filtered.map(function(r) {
+    var isImp = r.id && r.id.indexOf('imp_') === 0;
+    var impTag = isImp ? '<span style="font-size:10px;background:#e8eaf6;color:#3949ab;padding:1px 5px;border-radius:10px;margin-right:4px;">匯入</span>' : '';
+
+    if (r.type === 'income') {
+      var total = incTotal(r);
+      totalInc += total;
+      var tags = payCats.filter(function(p){ return r.pays&&r.pays[p.id]; }).map(function(p){
+        return '<span style="font-size:11px;background:'+p.color+'22;color:'+p.color+';padding:2px 6px;border-radius:10px;margin-right:2px;">'+p.name+' '+fmt(r.pays[p.id])+'</span>';
+      }).join('');
+      return '<tr><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
+        + '<td style="padding:8px 10px;">'+impTag+tags+(r.note?'<div style="font-size:11px;color:#aaa;">'+r.note+'</div>':'')+'</td>'
+        + '<td style="padding:8px 10px;text-align:right;color:#2e7d32;font-weight:500;">'+fmt(total)+'</td></tr>';
+    } else if (r.type === 'expense') {
+      totalExp += r.amount||0;
+      var cat2 = expCats.find(function(e){ return e.id===r.cat; })||{name:r.cat,color:'#888'};
+      var ncTag = r.noncash ? '<span style="font-size:10px;background:#f3e5f5;color:#7b1fa2;padding:1px 5px;border-radius:10px;margin-right:4px;">非現金</span>' : '';
+      var accTag = (r.accrual && r.accrual !== r.date.slice(0,7)) ? '<span style="font-size:10px;background:#fff3e0;color:#e65100;padding:1px 5px;border-radius:10px;margin-left:4px;">歸'+r.accrual+'</span>' : '';
+      return '<tr><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
+        + '<td style="padding:8px 10px;">'+impTag+ncTag+'<span style="font-size:11px;background:'+cat2.color+'22;color:'+cat2.color+';padding:2px 6px;border-radius:10px;">'+cat2.name+'</span>'+accTag+(r.note?'<div style="font-size:11px;color:#aaa;">'+r.note+'</div>':'')+'</td>'
+        + '<td style="padding:8px 10px;text-align:right;color:#c62828;font-weight:500;">-'+fmt(r.amount||0)+'</td></tr>';
+    } else if (r.type === 'settle') {
+      totalOther += r.amount||0;
+      var SL2={linepay:'Line Pay',jkopay:'街口支付',easycard:'悠遊卡'};
+      var SC2={linepay:'#2196f3',jkopay:'#9c27b0',easycard:'#ff9800'};
+      return '<tr><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
+        + '<td style="padding:8px 10px;"><span style="font-size:11px;background:#e3f2fd;color:#1565c0;padding:2px 6px;border-radius:10px;margin-right:4px;">入帳</span>'
+        + '<span style="font-size:11px;background:'+(SC2[r.cat]||'#888')+'22;color:'+(SC2[r.cat]||'#888')+';padding:2px 6px;border-radius:10px;">'+(SL2[r.cat]||r.cat)+'</span>'
+        + (r.note?'<div style="font-size:11px;color:#aaa;">'+r.note+'</div>':'')+'</td>'
+        + '<td style="padding:8px 10px;text-align:right;color:#1565c0;font-weight:500;">'+fmt(r.amount||0)+'</td></tr>';
+    } else if (r.type === 'deposit') {
+      var DL2={cash:'現金存入',transfer_in:'匯款收入',transfer_out:'匯款支出'};
+      var isOut = r.cat==='transfer_out';
+      if (isOut) totalExp += r.amount||0; else totalOther += r.amount||0;
+      return '<tr><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
+        + '<td style="padding:8px 10px;"><span style="font-size:11px;background:#ede7f6;color:#5c6bc0;padding:2px 6px;border-radius:10px;">'+(DL2[r.cat]||r.cat)+'</span>'
+        + (r.note?'<div style="font-size:11px;color:#aaa;">'+r.note+'</div>':'')+'</td>'
+        + '<td style="padding:8px 10px;text-align:right;color:'+(isOut?'#c62828':'#5c6bc0')+';font-weight:500;">'+(isOut?'-':'')+fmt(r.amount||0)+'</td></tr>';
+    }
+    return '';
+  }).join('');
+
+  // 合計列
+  var summaryHtml = '<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">';
+  if (totalInc) summaryHtml += '<div class="scard" style="flex:1;min-width:100px;"><div class="lbl">收入合計</div><div style="font-size:16px;font-weight:600;color:#2e7d32;">'+fmt(totalInc)+'</div></div>';
+  if (totalExp) summaryHtml += '<div class="scard" style="flex:1;min-width:100px;"><div class="lbl">支出合計</div><div style="font-size:16px;font-weight:600;color:#c62828;">'+fmt(totalExp)+'</div></div>';
+  if (totalOther) summaryHtml += '<div class="scard" style="flex:1;min-width:100px;"><div class="lbl">其他合計</div><div style="font-size:16px;font-weight:600;color:#1565c0;">'+fmt(totalOther)+'</div></div>';
+  summaryHtml += '<div class="scard" style="flex:1;min-width:100px;"><div class="lbl">筆數</div><div style="font-size:16px;font-weight:600;">'+filtered.length+'</div></div>';
+  summaryHtml += '</div>';
+
+  el.innerHTML = summaryHtml
+    + '<div class="lblock"><table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr style="background:#f5f4f0;">'
+    + '<th style="padding:8px 10px;text-align:left;font-size:12px;color:#666;font-weight:500;">日期</th>'
+    + '<th style="padding:8px 10px;text-align:left;font-size:12px;color:#666;font-weight:500;">項目</th>'
+    + '<th style="padding:8px 10px;text-align:right;font-size:12px;color:#666;font-weight:500;">金額</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 // ── 損益表 ──
