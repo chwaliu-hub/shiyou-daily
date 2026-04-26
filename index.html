@@ -393,6 +393,7 @@ function loadSettings() {
   apiGet({action:'getSettings'}, function(err, data) {
     if (!err && data.ok && data.settings) {
       var s = data.settings;
+      window._settingsCache = s;
       if (s.openingCash) {
         var el = document.getElementById('opening-cash');
         if (el) el.value = s.openingCash;
@@ -428,9 +429,16 @@ function saveR() { /* 雲端版不用本地存 */ }
 function saveSettings() {
   var cash = document.getElementById('opening-cash').value || '0';
   var bank = document.getElementById('opening-bank').value || '0';
-  apiPost({action:'saveSettings', settings:{openingCash:cash, openingBank:bank}}, function(err, data){
+  var month = document.getElementById('summary-month').value;
+  var key = month ? 'opening_' + month : 'openingCash';
+  var settings = {openingCash: cash, openingBank: bank};
+  if (month) {
+    settings['opening_cash_' + month] = cash;
+    settings['opening_bank_' + month] = bank;
+  }
+  apiPost({action:'saveSettings', settings:settings}, function(err, data){
     if (err || !data.ok) { showToast('設定儲存失敗', false); return; }
-    showToast('✓ 期初設定已儲存');
+    showToast('✓ ' + (month||'') + ' 期初設定已儲存');
   });
 }
 function saveP() {
@@ -773,7 +781,7 @@ function openEditModal(id) {
       + '<input type="number" id="edit-amount" value="' + (r.amount||0) + '" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>';
     body += '</div>';
     body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">費用歸屬月</label>'
-      + '<input type="month" id="edit-accrual" value="' + (r.accrual||r.date.slice(0,7)) + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+      + '<input type="month" id="edit-accrual" value="' + (r.accrual?String(r.accrual).slice(0,7):r.date.slice(0,7)) + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
     body += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'
       + '<input type="checkbox" id="edit-noncash"' + (r.noncash?' checked':'') + ' style="width:16px;height:16px;">'
       + '<label for="edit-noncash" style="font-size:13px;color:#666;">非現金支出（不計入現金流）</label></div>';
@@ -865,6 +873,21 @@ function deleteFromHistory(id) {
 function renderSummary() {
   var month = document.getElementById('summary-month').value;
   var el = document.getElementById('summary-content');
+  // 根據月份載入對應期初值
+  if (month && window._settingsCache) {
+    var sc = window._settingsCache;
+    var cashKey = 'opening_cash_' + month;
+    var bankKey = 'opening_bank_' + month;
+    if (sc[cashKey] !== undefined) {
+      var ce = document.getElementById('opening-cash');
+      if (ce && !ce._userEdited) ce.value = sc[cashKey];
+    }
+    if (sc[bankKey] !== undefined) {
+      var be = document.getElementById('opening-bank');
+      if (be && !be._userEdited) be.value = sc[bankKey];
+    }
+    updateOpeningTotal();
+  }
   if (!month) { el.innerHTML = '<div class="no-data">選擇月份</div>'; return; }
   var list = records.filter(function(r){ return r.date && r.date.startsWith(month); });
   if (!list.length) { el.innerHTML = '<div class="no-data">該月份無記錄</div>'; return; }
@@ -939,7 +962,15 @@ function renderSummary() {
     var dayIn=0, dayExp=0, dayTransferOut=0;
     byDate2[d].forEach(function(r){
       if (r.type === 'income') {
-        dayIn += incTotal(r);
+        // 只有現金和匯款計入現金流，行動支付等入帳時才計
+        var cashAmt = (r.pays && r.pays['cash']) || 0;
+        var transferAmt = 0;
+        payCats.forEach(function(p){
+          if (p.id !== 'cash' && p.id !== 'linepay' && p.id !== 'jkopay' && p.id !== 'easycard') {
+            transferAmt += (r.pays && r.pays[p.id]) || 0;
+          }
+        });
+        dayIn += cashAmt + transferAmt;
       } else if (r.type === 'settle') {
         dayIn += r.amount || 0;
       } else if (r.type === 'deposit') {
@@ -1143,7 +1174,8 @@ function runSearch() {
       totalExp += r.amount||0;
       var cat2 = expCats.find(function(e){ return e.id===r.cat; })||{name:r.cat,color:'#888'};
       var ncTag = r.noncash ? '<span style="font-size:10px;background:#f3e5f5;color:#7b1fa2;padding:1px 5px;border-radius:10px;margin-right:4px;">非現金</span>' : '';
-      var accTag = (r.accrual && r.accrual !== r.date.slice(0,7)) ? '<span style="font-size:10px;background:#fff3e0;color:#e65100;padding:1px 5px;border-radius:10px;margin-left:4px;">歸'+r.accrual+'</span>' : '';
+      var accrualDisplay = r.accrual ? String(r.accrual).slice(0,7) : r.date.slice(0,7);
+      var accTag = (accrualDisplay && accrualDisplay !== r.date.slice(0,7)) ? '<span style="font-size:10px;background:#fff3e0;color:#e65100;padding:1px 5px;border-radius:10px;margin-left:4px;">歸'+accrualDisplay+'</span>' : '';
       return '<tr style="cursor:pointer;" onclick="openEditModal(\''+r.id+'\')" title="點擊編輯"><td style="padding:8px 10px;font-size:12px;color:#888;">'+r.date+'</td>'
         + '<td style="padding:8px 10px;">'+impTag+ncTag+'<span style="font-size:11px;background:'+cat2.color+'22;color:'+cat2.color+';padding:2px 6px;border-radius:10px;">'+cat2.name+'</span>'+accTag+(r.note?'<div style="font-size:11px;color:#aaa;">'+r.note+'</div>':'')+'</td>'
         + '<td style="padding:8px 10px;text-align:right;color:#c62828;font-weight:500;">-'+fmt(r.amount||0)+'</td></tr>';
@@ -1211,7 +1243,7 @@ function renderPL() {
     if (!r.date) return;
     var recMonth = r.date.slice(0,7);
     // 支出用歸屬月
-    var month = (r.type === 'expense' && r.accrual) ? r.accrual : recMonth;
+    var month = (r.type === 'expense' && r.accrual) ? String(r.accrual).slice(0,7) : recMonth;
     if (!mData[month]) return; // 不在該年
 
     if (r.type === 'income') {
