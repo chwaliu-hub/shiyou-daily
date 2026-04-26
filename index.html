@@ -76,6 +76,19 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
 </head>
 <body>
 <div class="loading-bar" id="loading-bar"></div>
+<div id="edit-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;">
+  <div style="background:#fff;max-width:500px;margin:40px auto;border-radius:16px;padding:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h3 style="font-size:16px;font-weight:600;">編輯記錄</h3>
+      <button onclick="closeEditModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div id="edit-modal-body"></div>
+    <div style="display:flex;gap:8px;margin-top:20px;">
+      <button onclick="closeEditModal()" style="flex:1;padding:11px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;">取消</button>
+      <button onclick="saveEdit()" style="flex:1;padding:11px;border:none;border-radius:8px;background:#222;color:#fff;font-size:14px;cursor:pointer;font-weight:500;">儲存</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <h1>食悠餐桌 每日收支</h1>
 <div class="wrap">
@@ -178,16 +191,17 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
   <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:12px;">
     <div class="fld" style="margin-bottom:0;">
       <label style="font-size:12px;color:#666;">期初現金</label>
-      <input type="number" id="opening-cash" placeholder="0" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;">
+      <input type="number" id="opening-cash" placeholder="0" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;" oninput="updateOpeningTotal()">
     </div>
     <div class="fld" style="margin-bottom:0;">
       <label style="font-size:12px;color:#666;">期初銀行餘額</label>
-      <input type="number" id="opening-bank" placeholder="0" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;">
+      <input type="number" id="opening-bank" placeholder="0" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;" oninput="updateOpeningTotal()">
     </div>
     <div style="display:flex;align-items:flex-end;">
       <button onclick="renderSummary()" style="padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">計算</button>
     </div>
   </div>
+  <div style="font-size:13px;color:#666;margin-bottom:12px;">期初可用餘額：<b id="opening-total" style="color:#1565c0;">$0</b></div>
   <div id="summary-content"><div class="no-data">選擇月份查看匯總</div></div>
 </div>
 
@@ -605,14 +619,14 @@ function renderHistory() {
         }).join('');
         return '<tr><td>' + impTag + tags + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
           + '<td class="cf-in" style="text-align:right;">' + fmt(incTotal(r)) + '</td>'
-          + '<td style="text-align:right;"><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
+          + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
       } else if (r.type === 'settle') {
         var sc = SC[r.cat]||'#607d8b'; var sl = SL[r.cat]||r.cat;
         return '<tr><td><span style="font-size:11px;background:#e3f2fd;color:#1565c0;padding:2px 6px;border-radius:10px;margin-right:4px;">入帳</span>'
           + '<span style="font-size:11px;background:' + sc + '22;color:' + sc + ';padding:2px 6px;border-radius:10px;">' + sl + '</span>'
           + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
           + '<td class="cf-in" style="text-align:right;">' + fmt(r.amount) + '</td>'
-          + '<td style="text-align:right;"><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
+          + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
       } else {
         var cat = expCats.find(function(e){ return e.id === r.cat; }) || {name:r.cat, color:'#888'};
         return '<tr><td>' + impTag + '<span style="font-size:11px;background:' + cat.color + '22;color:' + cat.color + ';padding:2px 6px;border-radius:10px;">' + cat.name + '</span>'
@@ -635,6 +649,106 @@ function renderHistory() {
       + detailRows
       + '</tbody></table></div></div>';
   }).join('');
+}
+
+var editingId = null;
+
+function openEditModal(id) {
+  var r = records.find(function(rec){ return rec.id === id; });
+  if (!r) return;
+  editingId = id;
+
+  var body = '';
+  // 日期
+  body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">日期</label>'
+    + '<input type="date" id="edit-date" value="' + (r.date||'') + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+
+  if (r.type === 'income') {
+    // 收入：各支付方式金額
+    body += '<div style="font-size:12px;color:#666;margin-bottom:6px;">各支付方式金額</div>';
+    body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+    payCats.forEach(function(p){
+      body += '<div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">' + p.name + '</label>'
+        + '<input type="number" id="edit-pay-' + p.id + '" value="' + ((r.pays&&r.pays[p.id])||0) + '" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>';
+    });
+    body += '</div>';
+    body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">收入類型</label>'
+      + '<select id="edit-intype" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">'
+      + '<option value="operating"' + (r.inType!=='nonoperating'?' selected':'') + '>營業收入</option>'
+      + '<option value="nonoperating"' + (r.inType==='nonoperating'?' selected':'') + '>業外收入</option>'
+      + '</select></div>';
+  } else if (r.type === 'expense') {
+    // 支出：類別、金額、歸屬月
+    body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+    body += '<div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">類別</label>'
+      + '<select id="edit-cat" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">'
+      + expCats.map(function(e){ return '<option value="' + e.id + '"' + (r.cat===e.id?' selected':'') + '>' + e.name + '</option>'; }).join('')
+      + '</select></div>';
+    body += '<div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">金額</label>'
+      + '<input type="number" id="edit-amount" value="' + (r.amount||0) + '" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>';
+    body += '</div>';
+    body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">費用歸屬月</label>'
+      + '<input type="month" id="edit-accrual" value="' + (r.accrual||r.date.slice(0,7)) + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+  } else {
+    // settle / deposit：金額
+    body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">金額</label>'
+      + '<input type="number" id="edit-amount" value="' + (r.amount||0) + '" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+  }
+
+  // 備註
+  body += '<div class="fld"><label style="font-size:12px;color:#666;">備註</label>'
+    + '<input type="text" id="edit-note" value="' + (r.note||'') + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+
+  document.getElementById('edit-modal-body').innerHTML = body;
+  document.getElementById('edit-modal').style.display = 'block';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  editingId = null;
+}
+
+function saveEdit() {
+  if (!editingId) return;
+  var r = records.find(function(rec){ return rec.id === editingId; });
+  if (!r) return;
+
+  // 更新資料
+  var newDate = document.getElementById('edit-date').value;
+  if (newDate) r.date = newDate;
+  r.note = document.getElementById('edit-note').value.trim();
+
+  if (r.type === 'income') {
+    payCats.forEach(function(p){
+      var el = document.getElementById('edit-pay-' + p.id);
+      if (el) { if (!r.pays) r.pays = {}; r.pays[p.id] = parseFloat(el.value)||0; }
+    });
+    var inTypeEl = document.getElementById('edit-intype');
+    if (inTypeEl) r.inType = inTypeEl.value;
+  } else if (r.type === 'expense') {
+    var catEl = document.getElementById('edit-cat');
+    var amtEl = document.getElementById('edit-amount');
+    var accEl = document.getElementById('edit-accrual');
+    if (catEl) r.cat = catEl.value;
+    if (amtEl) r.amount = parseFloat(amtEl.value)||0;
+    if (accEl) r.accrual = accEl.value;
+  } else {
+    var amtEl2 = document.getElementById('edit-amount');
+    if (amtEl2) r.amount = parseFloat(amtEl2.value)||0;
+  }
+
+  closeEditModal();
+  renderHistory();
+  renderTodayList();
+  updateSum();
+
+  // 先刪後加
+  apiPost({action:'deleteRecord', id:r.id}, function(err) {
+    apiPost({action:'addRecord', record:r}, function(err2, data){
+      if (err2 || !data || !data.ok) { showToast('儲存失敗，請重試', false); return; }
+      showToast('✓ 修改已儲存');
+    });
+  });
 }
 
 function toggleDay(d) {
@@ -729,62 +843,52 @@ function renderSummary() {
   });
   var mobileUnsettle = mobileSales - mobileSettled;
 
-  // 每日現金＋銀行流水
-  var runCash = opening;
-  var runBank = openingBank;
+  // 每日可用餘額流水
+  var runBal = opening + openingBank;
   var cfRows = dates.map(function(d){
-    var dayCash=0, daySettle=0, dayExp=0, dayDeposit=0, dayTransferIn=0, dayTransferOut=0;
+    var dayIn=0, dayExp=0, dayTransferOut=0;
     byDate2[d].forEach(function(r){
       if (r.type === 'income') {
-        dayCash += (r.pays && r.pays['cash']) || 0;
-        // 匯款收入直接進銀行
-        payCats.filter(function(p){ return p.id !== 'cash' && p.id !== 'linepay' && p.id !== 'jkopay' && p.id !== 'easycard'; }).forEach(function(p){
-          dayTransferIn += (r.pays && r.pays[p.id]) || 0;
-        });
+        dayIn += incTotal(r);
       } else if (r.type === 'settle') {
-        daySettle += r.amount || 0;
+        dayIn += r.amount || 0;
       } else if (r.type === 'deposit') {
-        if (r.cat === 'cash') { dayDeposit += r.amount || 0; }
-        else if (r.cat === 'transfer_in') { dayTransferIn += r.amount || 0; }
-        else if (r.cat === 'transfer_out') { dayTransferOut += r.amount || 0; }
+        if (r.cat === 'transfer_in') dayIn += r.amount || 0;
+        else if (r.cat === 'transfer_out') dayTransferOut += r.amount || 0;
       } else if (r.type === 'expense') {
         dayExp += r.amount || 0;
       }
     });
-    // 現金：現金收入 - 現金支出 - 存入銀行
-    runCash += dayCash - dayExp - dayDeposit;
-    // 銀行：存入現金 + 行動支付入帳 + 匯款收入 - 匯款支出
-    runBank += dayDeposit + daySettle + dayTransferIn - dayTransferOut;
+    runBal += dayIn - dayExp - dayTransferOut;
     return '<tr>'
       + '<td>' + d.slice(5) + '</td>'
-      + '<td class="cf-in" style="text-align:right;">' + (dayCash>0?fmt(dayCash):'-') + '</td>'
-      + '<td class="cf-in" style="text-align:right;">' + (daySettle+dayTransferIn>0?fmt(daySettle+dayTransferIn):'-') + '</td>'
+      + '<td class="cf-in" style="text-align:right;">' + (dayIn>0?fmt(dayIn):'-') + '</td>'
       + '<td class="cf-out" style="text-align:right;">' + (dayExp>0?fmt(dayExp):'-') + '</td>'
-      + '<td class="cf-bal" style="text-align:right;color:' + (runCash>=0?'#2e7d32':'#c62828') + ';">' + fmt(runCash) + '</td>'
-      + '<td class="cf-bal" style="text-align:right;color:' + (runBank>=0?'#1565c0':'#c62828') + ';">' + fmt(runBank) + '</td>'
+      + '<td class="cf-bal" style="text-align:right;color:' + (runBal>=0?'#2e7d32':'#c62828') + ';">' + fmt(runBal) + '</td>'
       + '</tr>';
   }).join('');
 
-  var closingCash = runCash;
-  var closingBank = runBank;
+  var closingBal = runBal;
 
   el.innerHTML += '<div class="block" style="margin-top:12px;border-left:3px solid #388e3c;">'
     + '<h3 style="margin-bottom:12px;">現金流</h3>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">'
-    + '<div class="scard"><div class="lbl">期初現金</div><div style="font-size:16px;font-weight:600;">' + fmt(opening) + '</div></div>'
-    + '<div class="scard"><div class="lbl">期末現金</div><div style="font-size:16px;font-weight:600;color:' + (closingCash>=0?'#2e7d32':'#c62828') + ';">' + fmt(closingCash) + '</div></div>'
-    + '<div class="scard"><div class="lbl">待入帳</div><div style="font-size:16px;font-weight:600;color:#e65100;">' + fmt(mobileUnsettle) + '</div></div>'
-    + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">'
-    + '<div class="scard"><div class="lbl">期初銀行</div><div style="font-size:16px;font-weight:600;">' + fmt(openingBank) + '</div></div>'
-    + '<div class="scard"><div class="lbl">期末銀行</div><div style="font-size:16px;font-weight:600;color:#1565c0;">' + fmt(closingBank) + '</div></div>'
-    + '<div class="scard"><div class="lbl">現金＋銀行</div><div style="font-size:16px;font-weight:600;color:#333;">' + fmt(closingCash+closingBank) + '</div></div>'
+    + '<div class="scard"><div class="lbl">期初可用餘額</div><div style="font-size:16px;font-weight:600;">' + fmt(opening+openingBank) + '</div></div>'
+    + '<div class="scard"><div class="lbl">期末可用餘額</div><div style="font-size:16px;font-weight:600;color:' + (closingBal>=0?'#2e7d32':'#c62828') + ';">' + fmt(closingBal) + '</div></div>'
+    + '<div class="scard"><div class="lbl">待入帳</div><div style="font-size:16px;font-weight:600;color:#e65100;">' + fmt(mobileUnsettle) + '</div></div>'
     + '</div>'
     + '<div style="overflow-x:auto;">'
     + '<table class="cf-table"><thead><tr>'
-    + '<th>日期</th><th style="text-align:right;">現金收</th><th style="text-align:right;">銀行收</th><th style="text-align:right;">支出</th><th style="text-align:right;">現金餘額</th><th style="text-align:right;">銀行餘額</th>'
+    + '<th>日期</th><th style="text-align:right;">收入</th><th style="text-align:right;">支出</th><th style="text-align:right;">可用餘額</th>'
     + '</tr></thead><tbody>' + cfRows + '</tbody></table>'
     + '</div></div>';
+}
+
+function updateOpeningTotal() {
+  var cash = parseFloat(document.getElementById('opening-cash').value) || 0;
+  var bank = parseFloat(document.getElementById('opening-bank').value) || 0;
+  var el = document.getElementById('opening-total');
+  if (el) el.textContent = fmt(cash + bank);
 }
 
 function renderColorRow(cid, sel, type) {
