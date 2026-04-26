@@ -99,6 +99,7 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
   <button class="tab" id="tab-settings" onclick="sw('settings')">類別設定</button>
   <button class="tab" id="tab-pl" onclick="sw('pl')">損益表</button>
   <button class="tab" id="tab-search" onclick="sw('search')">查詢</button>
+  <button class="tab" id="tab-payable" onclick="sw('payable')">應付帳款</button>
 </div>
 
 <div class="page active" id="page-entry">
@@ -265,6 +266,53 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
   </div>
 
   <div id="search-result"></div>
+</div>
+
+<div class="page" id="page-payable">
+  <!-- 新增應付帳款 -->
+  <div class="block" style="margin-bottom:12px;">
+    <h3 style="margin-bottom:14px;">新增應付帳款</h3>
+    <div class="row2">
+      <div class="fld"><label>收貨日期</label><input type="date" id="pay-date" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;width:100%;"></div>
+      <div class="fld"><label>廠商名稱</label><input type="text" id="pay-vendor" placeholder="例：美食家、傑盟" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>
+    </div>
+    <div class="row2">
+      <div class="fld"><label>費用類別</label><select id="pay-cat" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></select></div>
+      <div class="fld"><label>金額</label><input type="number" id="pay-amount" placeholder="0" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>
+    </div>
+    <div class="row2">
+      <div class="fld"><label>預計付款日</label><input type="date" id="pay-due" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;width:100%;"></div>
+      <div class="fld"><label>備註</label><input type="text" id="pay-note" placeholder="選填"></div>
+    </div>
+    <button class="add-btn" onclick="addPayable()">＋ 新增應付帳款</button>
+  </div>
+
+  <!-- 篩選 -->
+  <div style="display:flex;gap:8px;margin-bottom:12px;">
+    <button id="pf-unpaid" onclick="filterPayable('unpaid')" style="flex:1;padding:8px;border:1px solid #c62828;border-radius:8px;background:#c62828;color:#fff;font-size:13px;cursor:pointer;font-weight:500;">未結清</button>
+    <button id="pf-all" onclick="filterPayable('all')" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#888;font-size:13px;cursor:pointer;">全部</button>
+  </div>
+
+  <!-- 統計 -->
+  <div id="payable-summary" style="margin-bottom:12px;"></div>
+
+  <!-- 清單 -->
+  <div id="payable-list"><div class="no-data">載入中...</div></div>
+</div>
+
+<!-- 結清 Modal -->
+<div id="pay-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;">
+  <div style="background:#fff;max-width:480px;margin:40px auto;border-radius:16px;padding:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="font-size:16px;font-weight:600;">確認結清付款</h3>
+      <button onclick="closePayModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div id="pay-modal-body"></div>
+    <div style="display:flex;gap:8px;margin-top:20px;">
+      <button onclick="closePayModal()" style="flex:1;padding:11px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;">取消</button>
+      <button onclick="confirmPay()" style="flex:1;padding:11px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:14px;cursor:pointer;font-weight:500;">確認付款</button>
+    </div>
+  </div>
 </div>
 
 <div class="page" id="page-settings">
@@ -487,7 +535,7 @@ function importHistorical() {
 }
 
 function sw(tab) {
-  ['entry','history','summary','settings','pl','search'].forEach(function(id) {
+  ['entry','history','summary','settings','pl','search','payable'].forEach(function(id) {
     document.getElementById('tab-'+id).classList.toggle('active', id===tab);
     document.getElementById('page-'+id).classList.toggle('active', id===tab);
   });
@@ -496,6 +544,7 @@ function sw(tab) {
   if (tab === 'settings') renderSettings();
   if (tab === 'pl') renderPL();
   if (tab === 'search') initSearch();
+  if (tab === 'payable') initPayable();
 }
 
 function setToday() {
@@ -1314,6 +1363,210 @@ function runSearch() {
     + '<th style="padding:8px 10px;text-align:left;font-size:12px;color:#666;font-weight:500;">項目</th>'
     + '<th style="padding:8px 10px;text-align:right;font-size:12px;color:#666;font-weight:500;">金額</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+// ── 應付帳款 ──
+var payables = [];
+var payableFilter = 'unpaid';
+var payingId = null;
+
+function initPayable() {
+  // 填入費用類別選單
+  var sel = document.getElementById('pay-cat');
+  if (sel) {
+    sel.innerHTML = expCats.map(function(e){
+      return '<option value="' + e.id + '">' + e.name + '</option>';
+    }).join('');
+  }
+  // 設今天為預設日期
+  var today = new Date();
+  var td = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  var dateEl = document.getElementById('pay-date');
+  var dueEl = document.getElementById('pay-due');
+  if (dateEl && !dateEl.value) dateEl.value = td;
+  if (dueEl && !dueEl.value) dueEl.value = td;
+  loadPayables();
+}
+
+function loadPayables() {
+  apiGet({action:'getPayables'}, function(err, data) {
+    if (err || !data.ok) { document.getElementById('payable-list').innerHTML = '<div class="no-data">載入失敗</div>'; return; }
+    payables = data.data || [];
+    renderPayables();
+  });
+}
+
+function filterPayable(f) {
+  payableFilter = f;
+  document.getElementById('pf-unpaid').style.background = f==='unpaid' ? '#c62828' : '#fff';
+  document.getElementById('pf-unpaid').style.color = f==='unpaid' ? '#fff' : '#888';
+  document.getElementById('pf-unpaid').style.borderColor = f==='unpaid' ? '#c62828' : '#ddd';
+  document.getElementById('pf-all').style.background = f==='all' ? '#222' : '#fff';
+  document.getElementById('pf-all').style.color = f==='all' ? '#fff' : '#888';
+  document.getElementById('pf-all').style.borderColor = f==='all' ? '#222' : '#ddd';
+  renderPayables();
+}
+
+function renderPayables() {
+  var list = payableFilter === 'unpaid'
+    ? payables.filter(function(p){ return p.status !== 'paid'; })
+    : payables;
+
+  // 統計
+  var totalUnpaid = payables.filter(function(p){ return p.status !== 'paid'; })
+    .reduce(function(s,p){ return s + (p.amount||0); }, 0);
+  var overdue = payables.filter(function(p){
+    return p.status !== 'paid' && p.dueDate && p.dueDate < new Date().toISOString().slice(0,10);
+  }).reduce(function(s,p){ return s + (p.amount||0); }, 0);
+
+  document.getElementById('payable-summary').innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">'
+    + '<div class="scard"><div class="lbl">未結清總額</div><div style="font-size:18px;font-weight:600;color:#c62828;">' + fmt(totalUnpaid) + '</div></div>'
+    + '<div class="scard"><div class="lbl">逾期未付</div><div style="font-size:18px;font-weight:600;color:#e65100;">' + fmt(overdue) + '</div></div>'
+    + '</div>';
+
+  if (!list.length) {
+    document.getElementById('payable-list').innerHTML = '<div class="no-data">' + (payableFilter==='unpaid'?'無未結清項目':'無記錄') + '</div>';
+    return;
+  }
+
+  list.sort(function(a,b){ return (a.dueDate||'') > (b.dueDate||'') ? 1 : -1; });
+
+  var today = new Date().toISOString().slice(0,10);
+  document.getElementById('payable-list').innerHTML = list.map(function(p) {
+    var isPaid = p.status === 'paid';
+    var isOverdue = !isPaid && p.dueDate && p.dueDate < today;
+    var cat = expCats.find(function(e){ return e.id === p.cat; }) || {name:p.cat, color:'#888'};
+    var statusTag = isPaid
+      ? '<span style="font-size:11px;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;">已付</span>'
+      : isOverdue
+        ? '<span style="font-size:11px;background:#ffebee;color:#c62828;padding:2px 8px;border-radius:10px;">逾期</span>'
+        : '<span style="font-size:11px;background:#fff8e1;color:#f57c00;padding:2px 8px;border-radius:10px;">未付</span>';
+
+    return '<div class="block" style="margin-bottom:10px;' + (isOverdue?'border-left:3px solid #c62828;':'') + '">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
+      + '<div>'
+      + '<span style="font-weight:600;font-size:14px;">' + (p.vendor||'-') + '</span>'
+      + '&nbsp;&nbsp;' + statusTag
+      + '</div>'
+      + '<span style="font-size:16px;font-weight:600;color:' + (isPaid?'#888':'#c62828') + ';">' + fmt(p.amount||0) + '</span>'
+      + '</div>'
+      + '<div style="display:flex;gap:16px;font-size:12px;color:#888;margin-bottom:8px;">'
+      + '<span>收貨 ' + (p.date||'-') + '</span>'
+      + '<span>應付 ' + (p.dueDate||'-') + '</span>'
+      + '<span style="background:' + cat.color + '22;color:' + cat.color + ';padding:1px 6px;border-radius:8px;">' + cat.name + '</span>'
+      + '</div>'
+      + (p.note ? '<div style="font-size:12px;color:#aaa;margin-bottom:8px;">' + p.note + '</div>' : '')
+      + (isPaid ? '<div style="font-size:12px;color:#aaa;">付款日：' + (p.paidDate||'-') + '</div>' : '')
+      + (!isPaid ? '<div style="display:flex;gap:8px;margin-top:8px;">'
+          + '<button data-id="' + p.id + '" onclick="openPayModal(this.dataset.id)" style="flex:1;padding:8px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:13px;cursor:pointer;font-weight:500;">✓ 結清付款</button>'
+          + '<button data-id="' + p.id + '" onclick="deletePayable(this.dataset.id)" style="padding:8px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;color:#888;">刪除</button>'
+          + '</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function addPayable() {
+  var date = document.getElementById('pay-date').value;
+  var vendor = document.getElementById('pay-vendor').value.trim();
+  var cat = document.getElementById('pay-cat').value;
+  var amount = parseFloat(document.getElementById('pay-amount').value) || 0;
+  var due = document.getElementById('pay-due').value;
+  var note = document.getElementById('pay-note').value.trim();
+
+  if (!date) { alert('請選擇收貨日期'); return; }
+  if (!vendor) { alert('請填入廠商名稱'); return; }
+  if (!amount) { alert('請填入金額'); return; }
+
+  var p = {id:uid(), date:date, vendor:vendor, cat:cat, amount:amount, dueDate:due, status:'unpaid', note:note};
+  payables.push(p);
+  renderPayables();
+
+  document.getElementById('pay-vendor').value = '';
+  document.getElementById('pay-amount').value = '';
+  document.getElementById('pay-note').value = '';
+
+  apiPost({action:'addPayable', payable:p}, function(err, data){
+    if (err || !data.ok) { showToast('儲存失敗', false); payables.pop(); renderPayables(); return; }
+    showToast('✓ 應付帳款已記錄');
+  });
+}
+
+function openPayModal(id) {
+  var p = payables.find(function(x){ return x.id === id; });
+  if (!p) return;
+  payingId = id;
+  var today = new Date();
+  var td = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  var cat = expCats.find(function(e){ return e.id === p.cat; }) || {name:p.cat, color:'#888'};
+
+  document.getElementById('pay-modal-body').innerHTML =
+    '<div style="background:#f5f4f0;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;">'
+    + '<div style="font-weight:600;margin-bottom:4px;">' + p.vendor + ' — ' + fmt(p.amount) + '</div>'
+    + '<div style="color:#888;">收貨：' + p.date + '｜類別：' + cat.name + '</div>'
+    + (p.note ? '<div style="color:#aaa;margin-top:4px;">' + p.note + '</div>' : '')
+    + '</div>'
+    + '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">實際付款日</label>'
+    + '<input type="date" id="modal-pay-date" value="' + td + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>'
+    + '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">費用歸屬月（預設收貨月）</label>'
+    + '<input type="month" id="modal-accrual" value="' + p.date.slice(0,7) + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>'
+    + '<div class="fld"><label style="font-size:12px;color:#666;">備註</label>'
+    + '<input type="text" id="modal-note" value="' + (p.note||'') + '" placeholder="選填" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+
+  document.getElementById('pay-modal').style.display = 'block';
+}
+
+function closePayModal() {
+  document.getElementById('pay-modal').style.display = 'none';
+  payingId = null;
+}
+
+function confirmPay() {
+  if (!payingId) return;
+  var p = payables.find(function(x){ return x.id === payingId; });
+  if (!p) return;
+
+  var paidDate = document.getElementById('modal-pay-date').value;
+  var accrual = document.getElementById('modal-accrual').value;
+  var note = document.getElementById('modal-note').value.trim();
+
+  if (!paidDate) { alert('請選擇付款日期'); return; }
+
+  var recId = uid();
+  var rec = {
+    id: recId,
+    date: paidDate,
+    type: 'expense',
+    cat: p.cat,
+    amount: p.amount,
+    note: '【結清】' + p.vendor + (note ? ' ' + note : ''),
+    accrual: accrual
+  };
+
+  // 更新本地
+  p.status = 'paid';
+  p.paidDate = paidDate;
+  records.push(rec);
+  closePayModal();
+  renderPayables();
+  renderTodayList();
+  updateSum();
+
+  // 同步雲端
+  apiPost({action:'payPayable', id:p.id, paidDate:paidDate, paidRecordId:recId, record:rec}, function(err, data){
+    if (err || !data.ok) { showToast('儲存失敗，請重試', false); return; }
+    showToast('✓ 已結清，支出記錄已新增');
+  });
+}
+
+function deletePayable(id) {
+  if (!confirm('確定刪除這筆應付帳款？')) return;
+  payables = payables.filter(function(p){ return p.id !== id; });
+  renderPayables();
+  apiPost({action:'deletePayable', id:id}, function(err, data){
+    if (err || !data.ok) { showToast('刪除失敗', false); return; }
+    showToast('✓ 已刪除');
+  });
 }
 
 // ── 損益表 ──
