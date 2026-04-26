@@ -977,14 +977,12 @@ function renderSummary() {
     var sc = window._settingsCache;
     var cashKey = 'opening_cash_' + month;
     var bankKey = 'opening_bank_' + month;
-    if (sc[cashKey] !== undefined) {
-      var ce = document.getElementById('opening-cash');
-      if (ce && !ce._userEdited) ce.value = sc[cashKey];
-    }
-    if (sc[bankKey] !== undefined) {
-      var be = document.getElementById('opening-bank');
-      if (be && !be._userEdited) be.value = sc[bankKey];
-    }
+    var ce = document.getElementById('opening-cash');
+    var be = document.getElementById('opening-bank');
+    if (sc[cashKey] !== undefined && ce) ce.value = sc[cashKey];
+    else if (sc['openingCash'] && ce) ce.value = sc['openingCash'];
+    if (sc[bankKey] !== undefined && be) be.value = sc[bankKey];
+    else if (sc['openingBank'] && be) be.value = sc['openingBank'];
     updateOpeningTotal();
   }
   if (!month) { el.innerHTML = '<div class="no-data">選擇月份</div>'; return; }
@@ -1387,23 +1385,23 @@ function renderPL() {
   }
 
   function fmtCell(n) {
-    if (n === 0) return '<td style="text-align:right;color:#bbb;">-</td>';
+    if (n === 0) return '<td style="text-align:right;color:#bbb;padding:6px 12px;min-width:80px;">-</td>';
     var color = n < 0 ? '#c62828' : '';
-    return '<td style="text-align:right;' + (color?'color:'+color+';':'') + '">' + fmt(n) + '</td>';
+    return '<td style="text-align:right;padding:6px 12px;min-width:80px;' + (color?'color:'+color+';':'') + '">' + fmt(n) + '</td>';
   }
   function fmtPct(val, base) {
-    if (!base) return '<td style="text-align:right;color:#bbb;">-</td>';
+    if (!base) return '<td style="text-align:right;color:#bbb;padding:6px 12px;">-</td>';
     var p = Math.round(val/base*100);
     var color = p < 0 ? '#c62828' : '#2e7d32';
-    return '<td style="text-align:right;font-size:11px;color:' + color + ';">' + p + '%</td>';
+    return '<td style="text-align:right;font-size:11px;padding:6px 12px;color:' + color + ';">' + p + '%</td>';
   }
   function totalCell(n, bold) {
     var color = n < 0 ? '#c62828' : '#2e7d32';
-    return '<td style="text-align:right;font-weight:' + (bold?'600':'400') + ';color:' + color + ';">' + fmt(n) + '</td>';
+    return '<td style="text-align:right;padding:6px 12px;min-width:80px;font-weight:' + (bold?'600':'400') + ';color:' + color + ';">' + fmt(n) + '</td>';
   }
 
-  var thStyle = 'style="padding:8px 10px;text-align:right;font-weight:500;font-size:12px;color:#666;white-space:nowrap;"';
-  var thLStyle = 'style="padding:8px 10px;text-align:left;font-weight:500;font-size:12px;color:#666;"';
+  var thStyle = 'style="padding:8px 12px;text-align:right;font-weight:500;font-size:12px;color:#666;white-space:nowrap;min-width:80px;"';
+  var thLStyle = 'style="padding:8px 12px;text-align:left;font-weight:500;font-size:12px;color:#666;min-width:140px;"';
   var separatorRow = '<tr style="background:#f5f4f0;"><td colspan="' + (months.length+2) + '" style="padding:4px;"></td></tr>';
 
   // 折線圖用 Canvas
@@ -1428,7 +1426,7 @@ function renderPL() {
   function addRow(label, vals, isTotal, isPercent, baseVals) {
     var style = isTotal ? 'font-weight:600;border-top:1px solid #e8e6e0;' : '';
     html += '<tr style="' + style + '">';
-    html += '<td style="padding:7px 10px;white-space:nowrap;">' + label + '</td>';
+    html += '<td style="padding:7px 12px;white-space:nowrap;">' + label + '</td>';
     if (isPercent) {
       fullYear.forEach(function(m, i) { html += fmtPct(vals[i], baseVals[i]); });
       html += fmtPct(vals.reduce(function(s,v){return s+v;},0), baseVals.reduce(function(s,v){return s+v;},0));
