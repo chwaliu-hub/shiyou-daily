@@ -438,6 +438,9 @@ function saveSettings() {
   }
   apiPost({action:'saveSettings', settings:settings}, function(err, data){
     if (err || !data.ok) { showToast('設定儲存失敗', false); return; }
+    // 更新本地快取
+    if (!window._settingsCache) window._settingsCache = {};
+    Object.keys(settings).forEach(function(k){ window._settingsCache[k] = settings[k]; });
     showToast('✓ ' + (month||'') + ' 期初設定已儲存');
   });
 }
@@ -973,16 +976,15 @@ function renderSummary() {
   var month = document.getElementById('summary-month').value;
   var el = document.getElementById('summary-content');
   // 根據月份載入對應期初值
-  if (month && window._settingsCache) {
-    var sc = window._settingsCache;
-    var cashKey = 'opening_cash_' + month;
-    var bankKey = 'opening_bank_' + month;
+  if (month) {
     var ce = document.getElementById('opening-cash');
     var be = document.getElementById('opening-bank');
-    if (sc[cashKey] !== undefined && ce) ce.value = sc[cashKey];
-    else if (sc['openingCash'] && ce) ce.value = sc['openingCash'];
-    if (sc[bankKey] !== undefined && be) be.value = sc[bankKey];
-    else if (sc['openingBank'] && be) be.value = sc['openingBank'];
+    var cashKey = 'opening_cash_' + month;
+    var bankKey = 'opening_bank_' + month;
+    var sc = window._settingsCache || {};
+    // 優先用月份專屬值，否則用通用值，否則清空
+    if (ce) ce.value = (sc[cashKey] !== undefined && sc[cashKey] !== '') ? sc[cashKey] : (sc['openingCash'] || '0');
+    if (be) be.value = (sc[bankKey] !== undefined && sc[bankKey] !== '') ? sc[bankKey] : (sc['openingBank'] || '0');
     updateOpeningTotal();
   }
   if (!month) { el.innerHTML = '<div class="no-data">選擇月份</div>'; return; }
