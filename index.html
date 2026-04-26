@@ -84,6 +84,7 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
   <button class="tab" id="tab-history" onclick="sw('history')">歷史記錄</button>
   <button class="tab" id="tab-summary" onclick="sw('summary')">月匯總</button>
   <button class="tab" id="tab-settings" onclick="sw('settings')">類別設定</button>
+  <button class="tab" id="tab-pl" onclick="sw('pl')">損益表</button>
 </div>
 
 <div class="page active" id="page-entry">
@@ -100,7 +101,15 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
   <div class="block">
     <h3>收入登錄</h3>
     <div id="pay-inputs"></div>
-    <div class="fld"><label>備註</label><input type="text" id="in-note" placeholder="選填"></div>
+    <div class="row2">
+      <div class="fld"><label>收入類型</label>
+        <select id="in-type">
+          <option value="operating">營業收入</option>
+          <option value="nonoperating">業外收入</option>
+        </select>
+      </div>
+      <div class="fld"><label>備註</label><input type="text" id="in-note" placeholder="選填"></div>
+    </div>
     <button class="add-btn" onclick="addIncome()">＋ 新增收入</button>
   </div>
   <div class="block">
@@ -109,7 +118,10 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
       <div class="fld"><label>類別</label><select id="exp-cat"></select></div>
       <div class="fld"><label>金額</label><input type="number" id="exp-amount" placeholder="0" min="0"></div>
     </div>
-    <div class="fld" style="margin-bottom:0"><label>說明</label><input type="text" id="exp-note" placeholder="選填"></div>
+    <div class="row2" style="margin-top:0;">
+      <div class="fld"><label>費用歸屬月</label><input type="month" id="exp-accrual" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;"></div>
+      <div class="fld"><label>說明</label><input type="text" id="exp-note" placeholder="選填"></div>
+    </div>
     <button class="add-btn" onclick="addExpense()">＋ 新增支出</button>
   </div>
   <div class="block">
@@ -177,6 +189,14 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
     </div>
   </div>
   <div id="summary-content"><div class="no-data">選擇月份查看匯總</div></div>
+</div>
+
+<div class="page" id="page-pl">
+  <div class="date-bar" style="margin-bottom:12px;">
+    <select id="pl-year" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;"></select>
+    <button onclick="renderPL()" style="padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">計算</button>
+  </div>
+  <div id="pl-content"><div class="no-data">選擇年份查看損益表</div></div>
 </div>
 
 <div class="page" id="page-settings">
@@ -362,13 +382,14 @@ function importHistorical() {
 }
 
 function sw(tab) {
-  ['entry','history','summary','settings'].forEach(function(id) {
+  ['entry','history','summary','settings','pl'].forEach(function(id) {
     document.getElementById('tab-'+id).classList.toggle('active', id===tab);
     document.getElementById('page-'+id).classList.toggle('active', id===tab);
   });
   if (tab === 'history') renderHistory();
   if (tab === 'summary') renderSummary();
   if (tab === 'settings') renderSettings();
+  if (tab === 'pl') renderPL();
 }
 
 function setToday() {
@@ -408,7 +429,8 @@ function addIncome() {
     pays[p.id] = v; total += v;
   });
   if (!total) { alert('請輸入收入金額'); return; }
-  var rec = {id:uid(), date:date, type:'income', pays:pays, note:document.getElementById('in-note').value.trim()};
+  var inType = document.getElementById('in-type') ? document.getElementById('in-type').value : 'operating';
+  var rec = {id:uid(), date:date, type:'income', pays:pays, note:document.getElementById('in-note').value.trim(), inType:inType};
   payCats.forEach(function(p) { var el = document.getElementById('pay-'+p.id); if(el) el.value = ''; });
   document.getElementById('in-note').value = '';
   records.push(rec);
@@ -423,10 +445,12 @@ function addExpense() {
   var date = gd(); if (!date) { alert('請先選擇日期'); return; }
   var amt = parseFloat(document.getElementById('exp-amount').value) || 0;
   if (!amt) { alert('請輸入金額'); return; }
+  var accrual = document.getElementById('exp-accrual').value || date.slice(0,7);
   var rec = {id:uid(), date:date, type:'expense',
     cat: document.getElementById('exp-cat').value,
     amount: amt,
-    note: document.getElementById('exp-note').value.trim()};
+    note: document.getElementById('exp-note').value.trim(),
+    accrual: accrual};
   document.getElementById('exp-amount').value = '';
   document.getElementById('exp-note').value = '';
   records.push(rec);
@@ -542,7 +566,9 @@ function renderTodayList() {
 function updateSum() {
   var date = gd(); var inc = 0, exp = 0;
   records.filter(function(r){ return r.date === date; }).forEach(function(r){
-    if (r.type === 'income') inc += incTotal(r); else exp += r.amount || 0;
+    if (r.type === 'income') inc += incTotal(r);
+    else if (r.type === 'expense') exp += r.amount || 0;
+    // settle 和 deposit 不算在今日收支
   });
   document.getElementById('ti').textContent = fmt(inc);
   document.getElementById('te').textContent = fmt(exp);
@@ -644,7 +670,8 @@ function renderSummary() {
   list.forEach(function(r){
     if (r.type==='income') {
       payCats.forEach(function(p){ var v=(r.pays&&r.pays[p.id])||0; pT[p.id]+=v; tInc+=v; });
-    } else { eT[r.cat]=(eT[r.cat]||0)+(r.amount||0); tExp+=r.amount||0; }
+    } else if (r.type==='expense') { eT[r.cat]=(eT[r.cat]||0)+(r.amount||0); tExp+=r.amount||0; }
+    // settle/deposit 不算在收支統計
   });
   var profit = tInc - tExp;
   el.innerHTML =
@@ -823,6 +850,153 @@ function addExpCat() {
   renderSettings(); renderExpSelect();
 }
 
+// ── 損益表 ──
+function initPLYear() {
+  var sel = document.getElementById('pl-year');
+  var now = new Date().getFullYear();
+  sel.innerHTML = '';
+  for (var y = now; y >= now - 3; y--) {
+    sel.innerHTML += '<option value="' + y + '">' + y + ' 年</option>';
+  }
+}
+
+function renderPL() {
+  var year = document.getElementById('pl-year').value;
+  var el = document.getElementById('pl-content');
+  if (!year) { el.innerHTML = '<div class="no-data">請選擇年份</div>'; return; }
+
+  // 找該年所有記錄（用歸屬月或記錄日期）
+  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+
+  // 收集每月資料
+  var mData = {}; // mData['2026-01'] = {opInc, nonopInc, exp:{cat:amt}}
+  months.forEach(function(m) { mData[year+'-'+m] = {opInc:0, nonopInc:0, exp:{}}; });
+
+  records.forEach(function(r) {
+    if (!r.date) return;
+    var recMonth = r.date.slice(0,7);
+    // 支出用歸屬月
+    var month = (r.type === 'expense' && r.accrual) ? r.accrual : recMonth;
+    if (!mData[month]) return; // 不在該年
+
+    if (r.type === 'income') {
+      var total = incTotal(r);
+      if (r.inType === 'nonoperating') mData[month].nonopInc += total;
+      else mData[month].opInc += total;
+    } else if (r.type === 'expense') {
+      mData[month].exp[r.cat] = (mData[month].exp[r.cat] || 0) + (r.amount || 0);
+    }
+  });
+
+  // 食材成本類別
+  var foodCats = ['food'];
+  // 固定/變動費用（食材以外）
+  var otherExpCats = expCats.filter(function(e) { return foodCats.indexOf(e.id) === -1; });
+
+  // 建表格
+  var colHeaders = months.map(function(m) { return m + '月'; });
+  var fullYear = months.map(function(m) { return year + '-' + m; });
+
+  function mVal(month, key, cat) {
+    if (!mData[month]) return 0;
+    if (key === 'opInc') return mData[month].opInc;
+    if (key === 'nonopInc') return mData[month].nonopInc;
+    if (key === 'exp' && cat) return mData[month].exp[cat] || 0;
+    return 0;
+  }
+  function rowTotal(key, cat) {
+    return fullYear.reduce(function(s,m){ return s + mVal(m,key,cat); }, 0);
+  }
+  function mGross(month) {
+    var food = mVal(month,'exp','food');
+    return mData[month] ? mData[month].opInc - food : 0;
+  }
+  function mOpProfit(month) {
+    var total = 0;
+    otherExpCats.forEach(function(e){ total += mVal(month,'exp',e.id); });
+    return mGross(month) - total;
+  }
+  function mNetProfit(month) {
+    return mOpProfit(month) + mVal(month,'nonopInc');
+  }
+
+  function fmtCell(n) {
+    if (n === 0) return '<td style="text-align:right;color:#bbb;">-</td>';
+    var color = n < 0 ? '#c62828' : '';
+    return '<td style="text-align:right;' + (color?'color:'+color+';':'') + '">' + fmt(n) + '</td>';
+  }
+  function fmtPct(val, base) {
+    if (!base) return '<td style="text-align:right;color:#bbb;">-</td>';
+    var p = Math.round(val/base*100);
+    var color = p < 0 ? '#c62828' : '#2e7d32';
+    return '<td style="text-align:right;font-size:11px;color:' + color + ';">' + p + '%</td>';
+  }
+  function totalCell(n, bold) {
+    var color = n < 0 ? '#c62828' : '#2e7d32';
+    return '<td style="text-align:right;font-weight:' + (bold?'600':'400') + ';color:' + color + ';">' + fmt(n) + '</td>';
+  }
+
+  var thStyle = 'style="padding:8px 10px;text-align:right;font-weight:500;font-size:12px;color:#666;white-space:nowrap;"';
+  var thLStyle = 'style="padding:8px 10px;text-align:left;font-weight:500;font-size:12px;color:#666;"';
+  var separatorRow = '<tr style="background:#f5f4f0;"><td colspan="' + (months.length+2) + '" style="padding:4px;"></td></tr>';
+
+  var html = '<div style="overflow-x:auto;">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<thead><tr style="border-bottom:2px solid #e8e6e0;">'
+    + '<th ' + thLStyle + '>項目</th>'
+    + months.map(function(m){ return '<th ' + thStyle + '>' + m + '月</th>'; }).join('')
+    + '<th ' + thStyle + '>全年</th>'
+    + '</tr></thead><tbody>';
+
+  function addRow(label, vals, isTotal, isPercent, baseVals) {
+    var style = isTotal ? 'font-weight:600;border-top:1px solid #e8e6e0;' : '';
+    html += '<tr style="' + style + '">';
+    html += '<td style="padding:7px 10px;white-space:nowrap;">' + label + '</td>';
+    if (isPercent) {
+      fullYear.forEach(function(m, i) { html += fmtPct(vals[i], baseVals[i]); });
+      html += fmtPct(vals.reduce(function(s,v){return s+v;},0), baseVals.reduce(function(s,v){return s+v;},0));
+    } else {
+      vals.forEach(function(v) { html += fmtCell(v); });
+      var t = vals.reduce(function(s,v){return s+v;},0);
+      html += totalCell(t, isTotal);
+    }
+    html += '</tr>';
+  }
+
+  // 營業收入
+  addRow('營業收入', fullYear.map(function(m){ return mVal(m,'opInc'); }), true);
+  // 食材成本
+  addRow('　－食材成本', fullYear.map(function(m){ return mVal(m,'exp','food'); }));
+  // 毛利
+  var grossVals = fullYear.map(function(m){ return mGross(m); });
+  addRow('═ 毛利', grossVals, true);
+  var opIncVals = fullYear.map(function(m){ return mVal(m,'opInc'); });
+  addRow('　毛利率', grossVals, false, true, opIncVals);
+
+  html += separatorRow;
+
+  // 各項費用
+  otherExpCats.forEach(function(e) {
+    addRow('　－' + e.name, fullYear.map(function(m){ return mVal(m,'exp',e.id); }));
+  });
+
+  // 營業淨利
+  var opProfitVals = fullYear.map(function(m){ return mOpProfit(m); });
+  addRow('═ 營業淨利', opProfitVals, true);
+  addRow('　淨利率', opProfitVals, false, true, opIncVals);
+
+  html += separatorRow;
+
+  // 業外收入
+  addRow('＋業外收入', fullYear.map(function(m){ return mVal(m,'nonopInc'); }));
+  // 稅前淨利
+  var netVals = fullYear.map(function(m){ return mNetProfit(m); });
+  addRow('═ 稅前淨利', netVals, true);
+
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
 setToday();
 load(); // 從雲端載入類別和記錄
 var now = new Date();
@@ -830,6 +1004,7 @@ var ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
 document.getElementById('history-month').value = ym;
 document.getElementById('summary-month').value = ym;
 document.getElementById('history-month').addEventListener('change', renderHistory);
+initPLYear();
 document.getElementById('summary-month').addEventListener('change', renderSummary);
 document.getElementById('entry-date').addEventListener('change', function(){ renderTodayList(); updateSum(); });
 </script>
