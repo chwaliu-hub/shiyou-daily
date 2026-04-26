@@ -711,21 +711,21 @@ function renderHistory() {
         }).join('');
         return '<tr><td>' + impTag + tags + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
           + '<td class="cf-in" style="text-align:right;">' + fmt(incTotal(r)) + '</td>'
-          + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
+          + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:13px;padding:2px 4px;" data-id="' + r.id + '" onclick="copyRecord(this.dataset.id)" title="複製">📋</button><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
       } else if (r.type === 'settle') {
         var sc = SC[r.cat]||'#607d8b'; var sl = SL[r.cat]||r.cat;
         return '<tr><td><span style="font-size:11px;background:#e3f2fd;color:#1565c0;padding:2px 6px;border-radius:10px;margin-right:4px;">入帳</span>'
           + '<span style="font-size:11px;background:' + sc + '22;color:' + sc + ';padding:2px 6px;border-radius:10px;">' + sl + '</span>'
           + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
           + '<td class="cf-in" style="text-align:right;">' + fmt(r.amount) + '</td>'
-          + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
+          + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:13px;padding:2px 4px;" data-id="' + r.id + '" onclick="copyRecord(this.dataset.id)" title="複製">📋</button><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
       } else {
         var cat = expCats.find(function(e){ return e.id === r.cat; }) || {name:r.cat, color:'#888'};
         var ncTag = r.noncash ? '<span style="font-size:10px;background:#f3e5f5;color:#7b1fa2;padding:1px 5px;border-radius:10px;margin-right:4px;">非現金</span>' : '';
         return '<tr><td>' + impTag + ncTag + '<span style="font-size:11px;background:' + cat.color + '22;color:' + cat.color + ';padding:2px 6px;border-radius:10px;">' + cat.name + '</span>'
           + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
           + '<td class="cf-out" style="text-align:right;">-' + fmt(r.amount) + '</td>'
-          + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
+          + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:13px;padding:2px 4px;" data-id="' + r.id + '" onclick="copyRecord(this.dataset.id)" title="複製">📋</button><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
       }
     }).join('');
     return '<div class="day-block" id="day-' + d + '">'
@@ -743,6 +743,68 @@ function renderHistory() {
       + '</tbody></table></div></div>';
   }).join('');
 }
+
+function copyRecord(id) {
+  var r = records.find(function(rec){ return rec.id === id; });
+  if (!r) return;
+
+  // 建立複本
+  var now = new Date();
+  var today = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+
+  var copy = JSON.parse(JSON.stringify(r));
+  copy.id = uid();
+  copy.date = today;
+
+  // 開啟編輯 Modal，預填複本資料
+  editingId = null; // 設為 null 表示新增，不是修改
+  copyingRecord = copy;
+
+  var body = '';
+  body += '<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:8px 12px;font-size:12px;color:#5d4037;margin-bottom:14px;">📋 複製自 ' + r.date + '，日期已改為今天，確認後儲存為新記錄</div>';
+  body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">日期</label>'
+    + '<input type="date" id="edit-date" value="' + today + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+
+  if (copy.type === 'income') {
+    body += '<div style="font-size:12px;color:#666;margin-bottom:6px;">各支付方式金額</div>';
+    body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+    payCats.forEach(function(p){
+      body += '<div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">' + p.name + '</label>'
+        + '<input type="number" id="edit-pay-' + p.id + '" value="' + ((copy.pays&&copy.pays[p.id])||0) + '" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>';
+    });
+    body += '</div>';
+    body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">收入類型</label>'
+      + '<select id="edit-intype" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">'
+      + '<option value="operating"' + (copy.inType!=='nonoperating'?' selected':'') + '>營業收入</option>'
+      + '<option value="nonoperating"' + (copy.inType==='nonoperating'?' selected':'') + '>業外收入</option>'
+      + '</select></div>';
+  } else if (copy.type === 'expense') {
+    body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+    body += '<div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">類別</label>'
+      + '<select id="edit-cat" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">'
+      + expCats.map(function(e){ return '<option value="' + e.id + '"' + (copy.cat===e.id?' selected':'') + '>' + e.name + '</option>'; }).join('')
+      + '</select></div>';
+    body += '<div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">金額</label>'
+      + '<input type="number" id="edit-amount" value="' + (copy.amount||0) + '" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>';
+    body += '</div>';
+    body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">費用歸屬月</label>'
+      + '<input type="month" id="edit-accrual" value="' + (copy.accrual?String(copy.accrual).slice(0,7):today.slice(0,7)) + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+    body += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'
+      + '<input type="checkbox" id="edit-noncash"' + (copy.noncash?' checked':'') + ' style="width:16px;height:16px;">'
+      + '<label for="edit-noncash" style="font-size:13px;color:#666;">非現金支出（不計入現金流）</label></div>';
+  } else {
+    body += '<div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">金額</label>'
+      + '<input type="number" id="edit-amount" value="' + (copy.amount||0) + '" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+  }
+
+  body += '<div class="fld"><label style="font-size:12px;color:#666;">備註</label>'
+    + '<input type="text" id="edit-note" value="' + (copy.note||'') + '" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>';
+
+  document.getElementById('edit-modal-body').innerHTML = body;
+  document.getElementById('edit-modal').style.display = 'block';
+}
+
+var copyingRecord = null;
 
 var editingId = null;
 
@@ -802,9 +864,46 @@ function openEditModal(id) {
 function closeEditModal() {
   document.getElementById('edit-modal').style.display = 'none';
   editingId = null;
+  copyingRecord = null;
 }
 
 function saveEdit() {
+  // 複製模式：新增一筆記錄
+  if (!editingId && copyingRecord) {
+    var copy = copyingRecord;
+    copy.date = document.getElementById('edit-date').value || copy.date;
+    copy.note = document.getElementById('edit-note').value.trim();
+    if (copy.type === 'income') {
+      payCats.forEach(function(p){
+        var el = document.getElementById('edit-pay-' + p.id);
+        if (el) { if (!copy.pays) copy.pays = {}; copy.pays[p.id] = parseFloat(el.value)||0; }
+      });
+      var itEl = document.getElementById('edit-intype');
+      if (itEl) copy.inType = itEl.value;
+    } else if (copy.type === 'expense') {
+      var catEl = document.getElementById('edit-cat');
+      var amtEl = document.getElementById('edit-amount');
+      var accEl = document.getElementById('edit-accrual');
+      var ncEl = document.getElementById('edit-noncash');
+      if (catEl) copy.cat = catEl.value;
+      if (amtEl) copy.amount = parseFloat(amtEl.value)||0;
+      if (accEl) copy.accrual = accEl.value;
+      if (ncEl) copy.noncash = ncEl.checked ? 1 : 0;
+    } else {
+      var amtEl2 = document.getElementById('edit-amount');
+      if (amtEl2) copy.amount = parseFloat(amtEl2.value)||0;
+    }
+    closeEditModal();
+    records.push(copy);
+    renderTodayList(); updateSum(); renderHistory();
+    apiPost({action:'addRecord', record:copy}, function(err, data){
+      if (err || !data.ok) { showToast('儲存失敗', false); records.pop(); return; }
+      showToast('✓ 複製記錄已儲存');
+    });
+    copyingRecord = null;
+    return;
+  }
+
   if (!editingId) return;
   var r = records.find(function(rec){ return rec.id === editingId; });
   if (!r) return;
