@@ -632,7 +632,7 @@ function renderHistory() {
         return '<tr><td>' + impTag + '<span style="font-size:11px;background:' + cat.color + '22;color:' + cat.color + ';padding:2px 6px;border-radius:10px;">' + cat.name + '</span>'
           + (r.note ? '<div style="font-size:11px;color:#aaa;">' + r.note + '</div>' : '') + '</td>'
           + '<td class="cf-out" style="text-align:right;">-' + fmt(r.amount) + '</td>'
-          + '<td style="text-align:right;"><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
+          + '<td style="text-align:right;white-space:nowrap;"><button style="background:none;border:none;cursor:pointer;color:#aaa;font-size:12px;padding:2px 4px;" data-id="' + r.id + '" onclick="openEditModal(this.dataset.id)">✏️</button><button class="del" data-id="' + r.id + '" onclick="deleteFromHistory(this.dataset.id)">✕</button></td></tr>';
       }
     }).join('');
     return '<div class="day-block" id="day-' + d + '">'
