@@ -274,7 +274,16 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
     <h3 style="margin-bottom:14px;">新增應付帳款</h3>
     <div class="row2">
       <div class="fld"><label>收貨日期</label><input type="date" id="pay-date" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;width:100%;"></div>
-      <div class="fld"><label>廠商名稱</label><input type="text" id="pay-vendor" placeholder="例：美食家、傑盟" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></div>
+      <div class="fld"><label>廠商名稱</label>
+        <select id="pay-vendor" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;">
+          <option value="">請選擇廠商</option>
+          <option value="美食家">美食家</option>
+          <option value="偉良">偉良</option>
+          <option value="雄泉">雄泉</option>
+          <option value="other">其他（手動輸入）</option>
+        </select>
+        <input type="text" id="pay-vendor-other" placeholder="請輸入廠商名稱" style="display:none;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-top:6px;">
+      </div>
     </div>
     <div class="row2">
       <div class="fld"><label>費用類別</label><select id="pay-cat" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;"></select></div>
@@ -1400,6 +1409,14 @@ function initPayable() {
   var dueEl = document.getElementById('pay-due');
   if (dateEl && !dateEl.value) dateEl.value = td;
   if (dueEl && !dueEl.value) dueEl.value = td;
+  // 廠商選單切換
+  var vendorSel = document.getElementById('pay-vendor');
+  if (vendorSel) {
+    vendorSel.addEventListener('change', function() {
+      var otherInput = document.getElementById('pay-vendor-other');
+      if (otherInput) otherInput.style.display = this.value === 'other' ? 'block' : 'none';
+    });
+  }
   loadPayables();
 }
 
@@ -1556,14 +1573,17 @@ function saveEditPayable() {
 
 function addPayable() {
   var date = document.getElementById('pay-date').value;
-  var vendor = document.getElementById('pay-vendor').value.trim();
+  var vendorSel = document.getElementById('pay-vendor');
+  var vendor = vendorSel.value === 'other'
+    ? (document.getElementById('pay-vendor-other').value.trim())
+    : vendorSel.value;
   var cat = document.getElementById('pay-cat').value;
   var amount = parseFloat(document.getElementById('pay-amount').value) || 0;
   var due = document.getElementById('pay-due').value;
   var note = document.getElementById('pay-note').value.trim();
 
   if (!date) { alert('請選擇收貨日期'); return; }
-  if (!vendor) { alert('請填入廠商名稱'); return; }
+  if (!vendor || vendor === 'other') { alert('請選擇或填入廠商名稱'); return; }
   if (!amount) { alert('請填入金額'); return; }
 
   var p = {id:uid(), date:date, vendor:vendor, cat:cat, amount:amount, dueDate:due, status:'unpaid', note:note};
@@ -1571,6 +1591,8 @@ function addPayable() {
   renderPayables();
 
   document.getElementById('pay-vendor').value = '';
+  var ov = document.getElementById('pay-vendor-other');
+  if (ov) { ov.value = ''; ov.style.display = 'none'; }
   document.getElementById('pay-amount').value = '';
   document.getElementById('pay-note').value = '';
 
