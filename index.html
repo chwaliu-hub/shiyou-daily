@@ -386,6 +386,40 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
 
 
 
+<!-- 攤提設定 Modal -->
+<div id="amort-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;">
+  <div style="background:#fff;max-width:480px;margin:40px auto;border-radius:16px;padding:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="font-size:16px;font-weight:600;">新增定期攤提／固定支出</h3>
+      <button onclick="closeAmortModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div class="fld" style="margin-bottom:12px;"><label style="font-size:12px;color:#666;">名稱</label>
+      <input type="text" id="am-name" placeholder="例：設備攤提、店租" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>
+    <div class="row2" style="margin-bottom:12px;">
+      <div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">費用類別</label>
+        <select id="am-cat" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></select></div>
+      <div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">每月金額</label>
+        <input type="number" id="am-amount" placeholder="0" min="0" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>
+    </div>
+    <div class="row2" style="margin-bottom:12px;">
+      <div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">每月幾號建立</label>
+        <input type="number" id="am-day" placeholder="1~28" min="1" max="28" value="1" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>
+      <div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">非現金支出</label>
+        <select id="am-noncash" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;">
+          <option value="0">否（計入現金流）</option>
+          <option value="1">是（僅計損益表）</option>
+        </select></div>
+    </div>
+    <div class="fld" style="margin-bottom:0;"><label style="font-size:12px;color:#666;">備註</label>
+      <input type="text" id="am-note" placeholder="選填" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:100%;"></div>
+    <div style="display:flex;gap:8px;margin-top:20px;">
+      <button onclick="closeAmortModal()" style="flex:1;padding:11px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;">取消</button>
+      <button onclick="saveAmort()" style="flex:1;padding:11px;border:none;border-radius:8px;background:#222;color:#fff;font-size:14px;cursor:pointer;font-weight:500;">儲存</button>
+    </div>
+  </div>
+</div>
+
+
 <script>
 // 錯誤攔截，顯示在頁面上
 window.onerror = function(msg, src, line, col, err) {
