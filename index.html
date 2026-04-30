@@ -365,6 +365,22 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
       <button onclick="addExpCat()">新增</button>
     </div>
   </div>
+
+  <!-- 快速輸入範本 -->
+  <div class="block" style="margin-top:12px;">
+    <h3 style="margin-bottom:14px;">快速輸入範本</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px;">設定常用支出範本，每日輸入時可一鍵帶入</p>
+    <div id="template-list"><div class="empty" style="padding:16px;">尚無範本</div></div>
+    <button class="add-btn" style="margin-top:10px;" onclick="openAmortModal('template')">＋ 新增快速範本</button>
+  </div>
+
+  <!-- 定期攤提設定 -->
+  <div class="block" style="margin-top:12px;">
+    <h3 style="margin-bottom:14px;">定期攤提／固定支出</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px;">設定後系統每月自動建立支出記錄（開啟網頁時檢查）</p>
+    <div id="amort-list"><div class="empty" style="padding:16px;">尚無設定</div></div>
+    <button class="add-btn" style="margin-top:10px;background:#5c6bc0;" onclick="openAmortModal('amort')">＋ 新增定期攤提</button>
+  </div>
 </div>
 </div>
 
