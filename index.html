@@ -1395,13 +1395,6 @@ var payableFilter = 'unpaid';
 var payingId = null;
 
 function initPayable() {
-  // 填入費用類別選單
-  var sel = document.getElementById('pay-cat');
-  if (sel) {
-    sel.innerHTML = expCats.map(function(e){
-      return '<option value="' + e.id + '">' + e.name + '</option>';
-    }).join('');
-  }
   // 設今天為預設日期
   var today = new Date();
   var td = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
@@ -1411,13 +1404,34 @@ function initPayable() {
   if (dueEl && !dueEl.value) dueEl.value = td;
   // 廠商選單切換
   var vendorSel = document.getElementById('pay-vendor');
-  if (vendorSel) {
+  if (vendorSel && !vendorSel._bound) {
+    vendorSel._bound = true;
     vendorSel.addEventListener('change', function() {
       var otherInput = document.getElementById('pay-vendor-other');
       if (otherInput) otherInput.style.display = this.value === 'other' ? 'block' : 'none';
     });
   }
+  // 費用類別（每次進入都更新，確保 expCats 已載入）
+  refreshPayCatSelect();
   loadPayables();
+}
+
+function refreshPayCatSelect() {
+  var sel = document.getElementById('pay-cat');
+  if (sel && expCats.length) {
+    sel.innerHTML = expCats.map(function(e){
+      return '<option value="' + e.id + '">' + e.name + '</option>';
+    }).join('');
+  }
+  // 同步更新編輯 Modal 的類別選單
+  var epSel = document.getElementById('ep-cat');
+  if (epSel && expCats.length) {
+    var curVal = epSel.value;
+    epSel.innerHTML = expCats.map(function(e){
+      return '<option value="' + e.id + '">' + e.name + '</option>';
+    }).join('');
+    if (curVal) epSel.value = curVal;
+  }
 }
 
 function loadPayables() {
