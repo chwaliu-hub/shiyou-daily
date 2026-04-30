@@ -73,6 +73,7 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
 .toast{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;white-space:nowrap;}
 .sync-status{font-size:11px;color:#aaa;text-align:right;padding:4px 0 8px;}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="loading-bar" id="loading-bar"></div>
@@ -210,6 +211,7 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
     <div style="display:flex;align-items:flex-end;gap:6px;">
       <button onclick="saveSettings()" style="padding:9px 14px;border:1px solid #5c6bc0;border-radius:8px;background:#fff;color:#5c6bc0;font-size:13px;cursor:pointer;white-space:nowrap;">儲存</button>
       <button onclick="renderSummary()" style="padding:9px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">計算</button>
+      <button onclick="exportSummaryExcel()" style="padding:9px 14px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">📊 匯出</button>
     </div>
   </div>
   <div style="font-size:13px;color:#666;margin-bottom:12px;">期初可用餘額：<b id="opening-total" style="color:#1565c0;">$0</b></div>
@@ -1935,6 +1937,175 @@ function checkAutoAmort() {
       if (!err && data.ok) showToast('✓ 自動建立：' + a.name);
     });
   });
+}
+
+// ── 匯出 Excel ──
+function exportSummaryExcel() {
+  var month = document.getElementById('summary-month').value;
+  if (!month) { alert('請先選擇月份並計算'); return; }
+  if (!window.XLSX) { alert('SheetJS 尚未載入，請重新整理頁面'); return; }
+
+  var list = records.filter(function(r){ return r.date && r.date.startsWith(month); });
+  if (!list.length) { alert('該月份無資料'); return; }
+
+  var wb = XLSX.utils.book_new();
+
+  // ── 工作表1：每日收支明細 ──
+  var detailData = [['日期','類型','說明','金額','費用歸屬月','備註']];
+  list.sort(function(a,b){ return a.date > b.date ? 1 : -1; });
+  list.forEach(function(r) {
+    if (r.type === 'income') {
+      var total = incTotal(r);
+      var payDesc = payCats.filter(function(p){ return r.pays&&r.pays[p.id]; })
+        .map(function(p){ return p.name+' $'+r.pays[p.id]; }).join('、');
+      detailData.push([r.date, '收入', payDesc, total, '', r.note||'']);
+    } else if (r.type === 'expense') {
+      var cat = expCats.find(function(e){ return e.id===r.cat; });
+      detailData.push([r.date, '支出', cat?cat.name:r.cat, -(r.amount||0), r.accrual||'', r.note||'']);
+    } else if (r.type === 'settle') {
+      var SL={linepay:'Line Pay',jkopay:'街口支付',easycard:'悠遊卡'};
+      detailData.push([r.date, '行動支付入帳', SL[r.cat]||r.cat, r.amount||0, '', r.note||'']);
+    } else if (r.type === 'deposit') {
+      var DL={cash:'現金存入',transfer_in:'匯款收入',transfer_out:'匯款支出'};
+      var sign = r.cat==='transfer_out' ? -1 : 1;
+      detailData.push([r.date, '銀行', DL[r.cat]||r.cat, sign*(r.amount||0), '', r.note||'']);
+    }
+  });
+
+  var ws1 = XLSX.utils.aoa_to_sheet(detailData);
+  // 欄寬
+  ws1['!cols'] = [{wch:12},{wch:14},{wch:30},{wch:12},{wch:12},{wch:20}];
+  // 標題列樣式
+  var headerStyle = {font:{bold:true}, fill:{fgColor:{rgb:'1565C0'}}, font:{bold:true,color:{rgb:'FFFFFF'}}};
+  ['A1','B1','C1','D1','E1','F1'].forEach(function(cell){
+    if (ws1[cell]) ws1[cell].s = headerStyle;
+  });
+  XLSX.utils.book_append_sheet(wb, ws1, month + ' 每日明細');
+
+  // ── 工作表2：月匯總 ──
+  var opening = parseFloat(document.getElementById('opening-cash').value) || 0;
+  var openingBank = parseFloat(document.getElementById('opening-bank').value) || 0;
+  var tInc=0, tExp=0, pT={}, eT={};
+  payCats.forEach(function(p){ pT[p.id]=0; });
+  expCats.forEach(function(e){ eT[e.id]=0; });
+  list.forEach(function(r){
+    if (r.type==='income') { payCats.forEach(function(p){ var v=(r.pays&&r.pays[p.id])||0; pT[p.id]+=v; tInc+=v; }); }
+    else if (r.type==='expense') { eT[r.cat]=(eT[r.cat]||0)+(r.amount||0); tExp+=r.amount||0; }
+  });
+
+  var summaryData = [
+    ['食悠餐桌 ' + month + ' 月匯總', ''],
+    ['', ''],
+    ['【收入】', ''],
+  ];
+  payCats.forEach(function(p){ summaryData.push([p.name, pT[p.id]||0]); });
+  summaryData.push(['收入合計', tInc]);
+  summaryData.push(['', '']);
+  summaryData.push(['【支出】', '']);
+  expCats.forEach(function(e){ if(eT[e.id]) summaryData.push([e.name, eT[e.id]]); });
+  summaryData.push(['支出合計', tExp]);
+  summaryData.push(['', '']);
+  summaryData.push(['【損益】', '']);
+  summaryData.push(['毛利（收入－食材）', tInc - (eT['food']||0)]);
+  summaryData.push(['毛利率', tInc ? Math.round((tInc-(eT['food']||0))/tInc*100)+'%' : '-']);
+  summaryData.push(['營業淨利', tInc - tExp]);
+  summaryData.push(['淨利率', tInc ? Math.round((tInc-tExp)/tInc*100)+'%' : '-']);
+  summaryData.push(['', '']);
+  summaryData.push(['【現金流】', '']);
+  summaryData.push(['期初可用餘額', opening + openingBank]);
+
+  // 計算期末
+  var runBal = opening + openingBank;
+  list.forEach(function(r){
+    if (r.type==='income') { runBal += (r.pays&&r.pays['cash'])||0; }
+    else if (r.type==='settle') runBal += r.amount||0;
+    else if (r.type==='deposit') {
+      if(r.cat==='transfer_in') runBal += r.amount||0;
+      else if(r.cat==='transfer_out') runBal -= r.amount||0;
+      else if(r.cat==='cash') {} // 現金存入不影響總額
+    } else if (r.type==='expense' && !r.noncash) runBal -= r.amount||0;
+  });
+  summaryData.push(['期末可用餘額', runBal]);
+
+  var ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+  ws2['!cols'] = [{wch:20},{wch:15}];
+  // 標題樣式
+  if (ws2['A1']) ws2['A1'].s = {font:{bold:true,sz:14}};
+  ['A3','A7','A11','A15'].forEach(function(cell){
+    if(ws2[cell]) ws2[cell].s = {font:{bold:true,color:{rgb:'1565C0'}}};
+  });
+  XLSX.utils.book_append_sheet(wb, ws2, month + ' 月匯總');
+
+  // ── 工作表3：損益表（全年）──
+  var year = month.slice(0,4);
+  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  var fullYear = months.map(function(m){ return year+'-'+m; });
+  var yearRecords = records.filter(function(r){ return r.date && r.date.startsWith(year); });
+
+  var mData = {};
+  fullYear.forEach(function(m){ mData[m]={opInc:0,nonopInc:0,exp:{}}; });
+  yearRecords.forEach(function(r){
+    if (!r.date) return;
+    var recMonth = r.date.slice(0,7);
+    var accMonth = (r.type==='expense'&&r.accrual) ? String(r.accrual).slice(0,7) : recMonth;
+    if (!mData[accMonth]) return;
+    if (r.type==='income') {
+      var t = incTotal(r);
+      if (r.inType==='nonoperating') mData[accMonth].nonopInc+=t;
+      else mData[accMonth].opInc+=t;
+    } else if (r.type==='expense') {
+      mData[accMonth].exp[r.cat]=(mData[accMonth].exp[r.cat]||0)+(r.amount||0);
+    }
+  });
+
+  var plHeader = ['項目'].concat(months.map(function(m){ return parseInt(m)+'月'; })).concat(['全年']);
+  var plData = [['食悠餐桌 ' + year + ' 年損益表'], [], plHeader];
+
+  function mVal(m,key,cat){
+    if(!mData[m]) return 0;
+    if(key==='opInc') return mData[m].opInc;
+    if(key==='nonopInc') return mData[m].nonopInc;
+    if(key==='exp'&&cat) return mData[m].exp[cat]||0;
+    return 0;
+  }
+  function rowData(label, fn) {
+    var vals = fullYear.map(fn);
+    var total = vals.reduce(function(s,v){return s+v;},0);
+    return [label].concat(vals).concat([total]);
+  }
+
+  plData.push(rowData('營業收入', function(m){ return mVal(m,'opInc'); }));
+  plData.push(rowData('　－食材成本', function(m){ return mVal(m,'exp','food'); }));
+  plData.push(rowData('═ 毛利', function(m){ return mVal(m,'opInc')-(mVal(m,'exp','food')||0); }));
+  plData.push([]);
+
+  var otherCats = expCats.filter(function(e){ return e.id!=='food'; });
+  otherCats.forEach(function(e){
+    plData.push(rowData('　－'+e.name, function(m){ return mVal(m,'exp',e.id); }));
+  });
+  plData.push(rowData('═ 營業淨利', function(m){
+    var gross = mVal(m,'opInc')-(mVal(m,'exp','food')||0);
+    var otherExp = otherCats.reduce(function(s,e){ return s+mVal(m,'exp',e.id); },0);
+    return gross - otherExp;
+  }));
+  plData.push([]);
+  plData.push(rowData('＋業外收入', function(m){ return mVal(m,'nonopInc'); }));
+  plData.push(rowData('═ 稅前淨利', function(m){
+    var gross = mVal(m,'opInc')-(mVal(m,'exp','food')||0);
+    var otherExp = otherCats.reduce(function(s,e){ return s+mVal(m,'exp',e.id); },0);
+    return gross - otherExp + mVal(m,'nonopInc');
+  }));
+
+  var ws3 = XLSX.utils.aoa_to_sheet(plData);
+  var colWidths = [{wch:22}];
+  for(var i=0;i<13;i++) colWidths.push({wch:11});
+  ws3['!cols'] = colWidths;
+  if(ws3['A1']) ws3['A1'].s={font:{bold:true,sz:14}};
+  XLSX.utils.book_append_sheet(wb, ws3, year + ' 損益表');
+
+  // 下載
+  XLSX.writeFile(wb, '食悠餐桌_' + month + '_報表.xlsx');
+  showToast('✓ Excel 已匯出');
 }
 
 // ── 損益表 ──
