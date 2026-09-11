@@ -2,13 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#222222">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="食悠收支">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>食悠餐桌 每日收支</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -74,104 +68,6 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
 .cf-in{color:#2e7d32;font-weight:500;}
 .cf-out{color:#c62828;font-weight:500;}
 .cf-bal{font-weight:600;}
-
-/* ══════ 手機版優化 ══════ */
-@media (max-width: 480px) {
-  body { font-size: 16px; padding-bottom: env(safe-area-inset-bottom); }
-  h1 { padding: 16px; font-size: 19px; }
-
-  .tabs {
-    position: sticky; top: 0; z-index: 20;
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab {
-    flex: 0 0 auto; min-width: 64px;
-    padding: 12px 14px; font-size: 13px;
-    white-space: nowrap;
-  }
-
-  .block { padding: 16px; border-radius: 14px; margin-bottom: 12px; }
-
-  .fld input, .fld select, input[type="date"], input[type="month"], input[type="number"], input[type="text"] {
-    padding: 13px 14px !important;
-    font-size: 16px !important; /* 防止 iOS 自動縮放 */
-    border-radius: 10px !important;
-    min-height: 46px;
-  }
-
-  .add-btn, .imp-btn {
-    padding: 15px !important;
-    font-size: 16px !important;
-    border-radius: 10px !important;
-    min-height: 50px;
-  }
-
-  .tbtn {
-    padding: 13px 16px !important;
-    font-size: 15px !important;
-    min-height: 46px;
-  }
-
-  .row2 { grid-template-columns: 1fr 1fr; gap: 8px; }
-
-  /* 今日明細列表 - 加大觸控區域 */
-  .lrow { padding: 14px 0 !important; }
-  .lrow > div:first-child { font-size: 14px; }
-
-  /* 刪除/編輯/複製按鈕加大 */
-  .del, button[onclick*="openEditModal"], button[onclick*="copyRecord"] {
-    font-size: 16px !important;
-    padding: 8px 10px !important;
-    min-width: 38px; min-height: 38px;
-  }
-
-  /* 歷史記錄日期區塊 */
-  .day-header { padding: 14px; }
-  .day-header .dh-right { font-size: 12px; gap: 8px; flex-wrap: wrap; }
-
-  /* Modal 全螢幕化 */
-  #edit-modal > div, #pay-modal > div, #amort-modal > div, #edit-payable-modal > div {
-    margin: 0 !important;
-    max-width: 100% !important;
-    min-height: 100vh;
-    border-radius: 0 !important;
-    padding: 20px 16px 40px !important;
-    padding-top: calc(20px + env(safe-area-inset-top)) !important;
-  }
-
-  /* 損益表表格 - 橫向滾動提示 */
-  .page#page-pl table { font-size: 12px; }
-
-  /* 查詢頁籤按鈕 */
-  #sq-tab-month, #sq-tab-range { padding: 11px !important; font-size: 14px !important; }
-
-  /* 快速範本按鈕 */
-  #quick-template-bar button {
-    padding: 10px 16px !important;
-    font-size: 14px !important;
-    min-height: 40px;
-  }
-
-  /* 應付帳款按鈕 */
-  .page#page-payable .block button { min-height: 44px; }
-
-  /* 統計卡片 */
-  .scard { padding: 10px; }
-  .scard .lbl { font-size: 11px; }
-
-  /* sync-status */
-  .sync-status { font-size: 12px; padding: 6px 0 10px; }
-
-  /* toast 加大 */
-  .toast { font-size: 14px; padding: 12px 24px; bottom: max(24px, env(safe-area-inset-bottom)); }
-}
-
-/* 觸控裝置：移除 hover 效果造成的點擊延遲問題改善 */
-@media (hover: none) {
-  .day-header:hover { background: inherit; }
-}
 .loading-bar{display:none;position:fixed;top:0;left:0;right:0;height:3px;background:#1565c0;z-index:9999;animation:slide 1s infinite;}
 @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 .toast{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;white-space:nowrap;}
@@ -180,7 +76,6 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
 </head>
 <body>
 <div class="loading-bar" id="loading-bar"></div>
-<div id="offline-bar" style="display:none;position:fixed;top:0;left:0;right:0;background:#e65100;color:#fff;text-align:center;padding:8px;font-size:13px;z-index:9998;">📴 目前離線，記錄將無法同步，請連網後重新整理</div>
 <div id="edit-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;">
   <div style="background:#fff;max-width:500px;margin:40px auto;border-radius:16px;padding:24px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -1801,7 +1696,7 @@ function renderPL() {
   });
 
   // 食材成本類別
-  var foodCats = ['food'];
+  var foodCats = ['food','u1789105131043kl7','u17891051561777zt','u1789105168511r3p','u1789105175993kjn','u1789105188749dle','u178910519636769g','u1789105204061e61'];
   // 固定/變動費用（食材以外）
   var otherExpCats = expCats.filter(function(e) { return foodCats.indexOf(e.id) === -1; });
 
@@ -1819,8 +1714,9 @@ function renderPL() {
   function rowTotal(key, cat) {
     return fullYear.reduce(function(s,m){ return s + mVal(m,key,cat); }, 0);
   }
+  var FOOD_IDS = ['food','u1789105131043kl7','u17891051561777zt','u1789105168511r3p','u1789105175993kjn','u1789105188749dle','u178910519636769g','u1789105204061e61'];
   function mGross(month) {
-    var food = mVal(month,'exp','food');
+    var food = FOOD_IDS.reduce(function(s,id){ return s + mVal(month,'exp',id); }, 0);
     return mData[month] ? mData[month].opInc - food : 0;
   }
   function mOpProfit(month) {
@@ -1889,7 +1785,27 @@ function renderPL() {
   // 營業收入
   addRow('營業收入', fullYear.map(function(m){ return mVal(m,'opInc'); }), true);
   // 食材成本
-  addRow('　－食材成本', fullYear.map(function(m){ return mVal(m,'exp','food'); }));
+  // 食材成本總計
+  addRow('　－食材成本（合計）', fullYear.map(function(m){
+    return FOOD_IDS.reduce(function(s,id){ return s + mVal(m,'exp',id); }, 0);
+  }));
+  // 食材成本細項
+  var foodCatNames = {
+    'food': '　　進貨',
+    'u1789105131043kl7': '　　進貨－海鮮',
+    'u17891051561777zt': '　　進貨－雞腿排',
+    'u1789105168511r3p': '　　進貨－牛肉',
+    'u1789105175993kjn': '　　進貨－豬肉',
+    'u1789105188749dle': '　　進貨－蔬菜',
+    'u178910519636769g': '　　進貨－乾貨／雜糧',
+    'u1789105204061e61': '　　進貨－其他食材'
+  };
+  FOOD_IDS.forEach(function(id) {
+    var hasData = fullYear.some(function(m){ return mVal(m,'exp',id) > 0; });
+    if (hasData) {
+      addRow(foodCatNames[id]||id, fullYear.map(function(m){ return mVal(m,'exp',id); }));
+    }
+  });
   // 毛利
   var grossVals = fullYear.map(function(m){ return mGross(m); });
   addRow('═ 毛利', grossVals, true);
@@ -2014,23 +1930,6 @@ document.getElementById('history-month').addEventListener('change', renderHistor
 initPLYear();
 document.getElementById('summary-month').addEventListener('change', renderSummary);
 document.getElementById('entry-date').addEventListener('change', function(){ renderTodayList(); updateSum(); });
-
-// ── PWA: 註冊 Service Worker（離線快取殼層）──
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js').catch(function(){});
-  });
-}
-
-// ── 離線偵測 ──
-function updateOnlineStatus() {
-  var bar = document.getElementById('offline-bar');
-  if (!bar) return;
-  bar.style.display = navigator.onLine ? 'none' : 'block';
-}
-window.addEventListener('online', updateOnlineStatus);
-window.addEventListener('offline', updateOnlineStatus);
-updateOnlineStatus();
 </script>
 </body>
 </html>
