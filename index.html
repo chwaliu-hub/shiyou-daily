@@ -269,6 +269,15 @@ h1{font-size:18px;font-weight:600;padding:14px 16px;background:#fff;border-botto
 </div>
 
 <div class="page" id="page-payable">
+  <!-- 月份統計 -->
+  <div class="block" style="margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="margin-bottom:0;">每月廠商統計</h3>
+      <input type="month" id="payable-stat-month" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff;" onchange="renderPayableStat()">
+    </div>
+    <div id="payable-stat"><div class="empty" style="padding:12px;">請選擇月份</div></div>
+  </div>
+
   <!-- 新增應付帳款 -->
   <div class="block" style="margin-bottom:12px;">
     <h3 style="margin-bottom:14px;">新增應付帳款</h3>
@@ -1408,7 +1417,74 @@ function loadPayables() {
     if (err || !data.ok) { document.getElementById('payable-list').innerHTML = '<div class="no-data">載入失敗</div>'; return; }
     payables = data.data || [];
     renderPayables();
+    renderPayableStat();
   });
+}
+
+function renderPayableStat() {
+  var month = document.getElementById('payable-stat-month') ? document.getElementById('payable-stat-month').value : '';
+  var el = document.getElementById('payable-stat');
+  if (!el) return;
+  if (!month) { el.innerHTML = '<div class="empty" style="padding:12px;">請選擇月份</div>'; return; }
+
+  // 篩選該月的應付帳款（以收貨日期為準）
+  var list = payables.filter(function(p) {
+    return p.date && p.date.startsWith(month);
+  });
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty" style="padding:12px;">' + month + ' 無應付帳款記錄</div>';
+    return;
+  }
+
+  // 按廠商分組
+  var vendors = {};
+  list.forEach(function(p) {
+    var v = p.vendor || '未知廠商';
+    if (!vendors[v]) vendors[v] = { paid: 0, unpaid: 0, paidCount: 0, unpaidCount: 0 };
+    if (p.status === 'paid') {
+      vendors[v].paid += p.amount || 0;
+      vendors[v].paidCount++;
+    } else {
+      vendors[v].unpaid += p.amount || 0;
+      vendors[v].unpaidCount++;
+    }
+  });
+
+  var totalPaid = list.filter(function(p){ return p.status==='paid'; }).reduce(function(s,p){ return s+(p.amount||0); }, 0);
+  var totalUnpaid = list.filter(function(p){ return p.status!=='paid'; }).reduce(function(s,p){ return s+(p.amount||0); }, 0);
+
+  var vendorKeys = Object.keys(vendors).sort();
+
+  var rows = vendorKeys.map(function(v) {
+    var d = vendors[v];
+    return '<tr>'
+      + '<td style="padding:9px 12px;font-weight:500;">' + v + '</td>'
+      + '<td style="padding:9px 12px;text-align:right;color:#2e7d32;">'
+      + (d.paid > 0 ? fmt(d.paid) + '<span style="font-size:10px;color:#aaa;margin-left:4px;">×' + d.paidCount + '</span>' : '-')
+      + '</td>'
+      + '<td style="padding:9px 12px;text-align:right;color:#c62828;">'
+      + (d.unpaid > 0 ? fmt(d.unpaid) + '<span style="font-size:10px;color:#aaa;margin-left:4px;">×' + d.unpaidCount + '</span>' : '-')
+      + '</td>'
+      + '<td style="padding:9px 12px;text-align:right;font-weight:600;">' + fmt(d.paid + d.unpaid) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<thead><tr style="background:#f5f4f0;">'
+    + '<th style="padding:8px 12px;text-align:left;font-weight:500;font-size:12px;color:#666;">廠商</th>'
+    + '<th style="padding:8px 12px;text-align:right;font-weight:500;font-size:12px;color:#2e7d32;">已付</th>'
+    + '<th style="padding:8px 12px;text-align:right;font-weight:500;font-size:12px;color:#c62828;">未付</th>'
+    + '<th style="padding:8px 12px;text-align:right;font-weight:500;font-size:12px;color:#666;">合計</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '<tfoot><tr style="border-top:2px solid #e8e6e0;background:#fafafa;">'
+    + '<td style="padding:9px 12px;font-weight:600;">合計</td>'
+    + '<td style="padding:9px 12px;text-align:right;font-weight:600;color:#2e7d32;">' + fmt(totalPaid) + '</td>'
+    + '<td style="padding:9px 12px;text-align:right;font-weight:600;color:#c62828;">' + fmt(totalUnpaid) + '</td>'
+    + '<td style="padding:9px 12px;text-align:right;font-weight:600;">' + fmt(totalPaid + totalUnpaid) + '</td>'
+    + '</tr></tfoot>'
+    + '</table>';
 }
 
 function filterPayable(f) {
