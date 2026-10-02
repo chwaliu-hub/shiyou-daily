@@ -1861,27 +1861,9 @@ function renderPL() {
   // 營業收入
   addRow('營業收入', fullYear.map(function(m){ return mVal(m,'opInc'); }), true);
   // 食材成本
-  // 食材成本總計
-  addRow('　－食材成本（合計）', fullYear.map(function(m){
+  addRow('　－食材成本', fullYear.map(function(m){
     return FOOD_IDS.reduce(function(s,id){ return s + mVal(m,'exp',id); }, 0);
   }));
-  // 食材成本細項
-  var foodCatNames = {
-    'food': '　　進貨',
-    'u1789105131043kl7': '　　進貨－海鮮',
-    'u17891051561777zt': '　　進貨－雞腿排',
-    'u1789105168511r3p': '　　進貨－牛肉',
-    'u1789105175993kjn': '　　進貨－豬肉',
-    'u1789105188749dle': '　　進貨－蔬菜',
-    'u178910519636769g': '　　進貨－乾貨／雜糧',
-    'u1789105204061e61': '　　進貨－其他食材'
-  };
-  FOOD_IDS.forEach(function(id) {
-    var hasData = fullYear.some(function(m){ return mVal(m,'exp',id) > 0; });
-    if (hasData) {
-      addRow(foodCatNames[id]||id, fullYear.map(function(m){ return mVal(m,'exp',id); }));
-    }
-  });
   // 毛利
   var grossVals = fullYear.map(function(m){ return mGross(m); });
   addRow('═ 毛利', grossVals, true);
